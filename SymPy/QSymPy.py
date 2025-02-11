@@ -1,8 +1,10 @@
+import pathlib
 import sympy as sp
 import itertools
 import numpy as np
 import sympy.physics
 import sympy.physics.quantum
+import openqasm3
 
 
 class QuantumGate:
@@ -120,6 +122,16 @@ class Hadamard_Gate(QuantumGate):
         self.matrix22_t[qubits_t[0]][0] = self.matrix
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
 
+class Barrier():
+
+    def __init__(self, step: int=0):
+        self.step = step
+    
+    def __str__(self):
+        return f'Barrier at step {self.step}'
+    def __repr__(self):
+        return self.__str__()
+
 class CNOT_Gate(QuantumGateMultiQubit):
     '''Class of the CNOT gate. It is a subclass of QuantumGateMultiQubit.
     For CNOT_c_t the matrix is |0_c⟩⟨0_c|⊗I_t+|1_c⟩⟨1_c|⊗X_t. For CNOT_t_c the matrix is I_t⊗|0_c⟩⟨0_c|+X_t⊗|1_c⟩⟨1_c|.
@@ -203,6 +215,7 @@ class QuantumCircuit():
         self.qubits = list(reversed(list(range(num_qubits))))
         self.clbits = list(reversed(list(range(num_clbits))))
         self.gate_collection = GateCollection()
+        self.barrier_collection = []
         self.steps = {} # will contain {step_number: [gate1, gate2, ...]}
         self.unitary = None
         self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CNOT']
@@ -236,7 +249,12 @@ class QuantumCircuit():
                 self.steps[step].append(gate)
                 #self.steps.sort()
                 #print(self.steps)
-            
+
+    def add_barrier(self, step: None|int=0):
+        if step is None:
+            step = max(tuple(self.steps.keys()))
+        bar = Barrier(step=step)
+        self.barrier_collection.append(bar)
     
     def _extend_CNOT(self, gates: tuple[QuantumGate]):
         _unitary = None
@@ -349,7 +367,7 @@ class QuantumCircuit():
                         nums_c = gate.matrix22_c_numeric[gate.qubits_c[0]][i].flatten()
                         for s, n in zip(symbs_c, nums_c):
                             self.unitary_numeric = self.unitary_numeric.subs(s, n)
-                    
+    
 class QuantumState():
     def __init__(self, num_qubits: int=1, method: str='statevector'):
         self.qubits = list(reversed(list(range(num_qubits))))
@@ -377,3 +395,105 @@ class QuantumState():
                     self.state = sp.Matrix([1-v, v], shape=(2, 1))
                 else:
                     self.state = sp.physics.quantum.TensorProduct(self.state, sp.Matrix([1-v, v], shape=(2, 1)))
+
+def openqasm3_to_qc(filepath: pathlib.Path, timestep:int|None=None, qc: QuantumCircuit|None=None, qbit_mapping:dict[int:int]|None=None, cbit_mapping:dict[int:int]|None=None):
+    '''Function to read an OpenQASM 3 file and convert it to a QuantumCircuit object. If a QuantumCircuit object is provided, the OpenQASM 3 file is appended to it.
+    in that case a qubit and cbit mapping is required as dicts: {*bitnumber qc: *bitnumber qasm}.
+    If a timestep is provided, it will overwrite the automatically determined value, which is 0 if there is no qc provided, or last timestep of the qc +1.
+    '''
+    def _qc_qbit(q_qasm, mapping=qbit_mapping):
+        return qbit_mapping[q_qasm]
+    def _qc_cbit(c_qasm, mapping=cbit_mapping):
+        return cbit_mapping[c_qasm]
+    
+    if qc is None:
+        qc = QuantumCircuit()
+    if timestep is None:
+        timestep: int = 0
+    else:
+        timestep = max(tuple(qc.steps.keys())) + 1
+        qc.add_barrier(step = timestep-1)
+    
+    with open(filepath, 'r') as f:
+        qpf = f.read()
+    
+    qpf = openqasm3.parse(qpf)
+    
+    qc = _iterate_over_qasm_statements(qpf, qc, timestep)
+    return qc
+    
+def _map_qasmgatename_to_qcgatename(qasm_gate:str=None):
+    if qasm_gate == 'x':
+        return 'X'
+    elif qasm_gate == 'y':
+        return 'Y'
+    elif qasm_gate == 'z':
+        return 'Z'
+    elif qasm_gate == 'h':
+        return 'H'
+    elif qasm_gate == 'cx':
+        return 'CNOT'
+    else:
+        raise ValueError('Unknown qasm gate name:', qasm_gate)
+    
+def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program, qc: QuantumCircuit, timestep:int):
+    gate_name_mapping_qasm_qc = {'x': 'X', 'y': 'Y', 'z': 'Z', 'h': 'H', 'cx': 'CNOT'}
+
+    for statement in qpf.statements:
+        if isinstance(statement, openqasm3.ast.Include):
+            print('Included filenames:', statement.filename)
+        elif isinstance(statement, openqasm3.ast.ClassicalDeclaration):
+            if isinstance(statement.type, openqasm3.ast.BitType):
+                cbit_type = 'bit'
+            else:
+                raise ValueError('Unknown type', 'statement.type:', statement.type)
+            cbit_name = statement.identifier.name
+            cbit_length = statement.type.size.value
+            if cbit_length > len(qc.clbits):
+                qc.clbits = list(reversed(list(range(cbit_length))))
+            #print('Classical bit name:', cbit_name)
+            #print('Classical bit type:', cbit_type)
+            #print('Classical bit length:', cbit_length)
+        elif isinstance(statement, openqasm3.ast.QubitDeclaration):
+            qbit_name = statement.qubit.name
+            qbit_length = statement.size.value
+            if qbit_length > len(qc.qubits):
+                qc.qubits = list(reversed(list(range(qbit_length))))
+            #print('Quantum bit name:', qbit_name)
+            #print('Quantum bit length:', qbit_length)
+        elif isinstance(statement, openqasm3.ast.QuantumGate):
+            qgate_name = statement.name.name
+            qgate_qbit_names = [statement.qubits[i].name.name for i in range(len(statement.qubits))]
+            qgate_qbit_indices = [statement.qubits[i].indices[0][0].value for i in range(len(statement.qubits))] # why is there doubly nested list in indices?
+            #print('Quantum gate name:', qgate_name)
+            #print('Quantum gate qubits names:', qgate_qbit_names)
+            #print('Quantum gate qubits indices:', qgate_qbit_indices)
+            qc_gate_name = _map_qasmgatename_to_qcgatename(qgate_name)
+            if len (qgate_qbit_indices) == 1: # single qubit gate
+                qc.add_gate(name=qc_gate_name, qubits_t=qgate_qbit_indices, step=timestep)
+            elif len (qgate_qbit_indices) == 2: # single qubit gate
+                qc.add_gate(name=qc_gate_name, qubits_c=[qgate_qbit_indices[0]], qubits_t=[qgate_qbit_indices[1]], step=timestep)
+        elif isinstance(statement, openqasm3.ast.QuantumBarrier):
+            #print(statement)
+            qbarrier_name = 'barrier' # name is not stored in statement 
+            qbarrier_qbit_names = [statement.qubits[i].name.name for i in range(len(statement.qubits))]
+            qbarrier_qbit_indices = [statement.qubits[i].indices[0][0].value for i in range(len(statement.qubits))] # why is there doubly nested list in indices?
+            #print('Quantum gate name:', qbarrier_name)
+            #print('Quantum gate qubits names:', qbarrier_qbit_names)
+            #print('Quantum gate qubits indices:', qbarrier_qbit_indices)
+            qc.add_barrier(step=timestep)
+            timestep += 1
+        elif isinstance(statement, openqasm3.ast.QuantumMeasurementStatement):
+            #print(statement)
+            qmeasurement_name = 'measurement' # name is not stored in statement 
+            qmeasurement_qbit_name = statement.measure.qubit.name.name
+            qmeasurement_qbit_index = statement.measure.qubit.indices[0][0].value
+            qmeasurement_cbit_name = statement.target.name.name
+            qmeasurement_cbit_index = statement.target.indices[0][0].value
+            #print('Quantum measurement name:', qmeasurement_name)
+            #print('Quantum measurement qubit name:', qmeasurement_qbit_name)
+            #print('Quantum measurement qubit index:', qmeasurement_qbit_index)
+            #print('Quantum measurement cbit name:', qmeasurement_cbit_name)
+            #print('Quantum measurement cbit index:', qmeasurement_cbit_index)
+    
+    return qc

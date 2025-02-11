@@ -1,0 +1,15 @@
+name: qcsymsim
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python
+  - numpy
+  - sympy
+  - openqasm3
+  - qiskit
+  - qiskit-ibm-runtime
+  - qiskit-aer
+  - ipykernel
+  - pylatexenc
