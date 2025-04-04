@@ -13,3 +13,4 @@ dependencies:
   - qiskit-aer
   - ipykernel
   - pylatexenc
+  - pytest
