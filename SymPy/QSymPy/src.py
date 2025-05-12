@@ -17,9 +17,9 @@ class QuantumGate:
         self.name = name
         self.shape = shape
         iter_indices = [str(sub[0])+str(sub[1]) for sub in itertools.product(range(shape[0]), range(shape[1]))] # (2,2) -> ['00', '01', '10', '11']
-        str_qubits_t = ''.join([str(q)+'_' for q in qubits_t])
-        str_qubits_c = ''.join([str(q)+'_' for q in qubits_c]) if qubits_c is not None else ''
-        self.atomics = {sub: sp.symbols(self.name+'_qt'+str_qubits_t+'qc'+str_qubits_c+'s'+str(step)+'_p'+sub) for sub in iter_indices} # {'00': I_qt0_qc0_s0_p00, '01': I_qt0_qc0_s0_p01, ...}
+        str_qubits_t = ''.join([str(q)+'' for q in qubits_t])
+        str_qubits_c = ''.join([str(q)+'' for q in qubits_c]) if qubits_c is not None else ''
+        self.atomics = {sub: sp.symbols(self.name+'_qt'+str_qubits_t+'_qc'+str_qubits_c+'_s'+str(step)+'_p'+sub) for sub in iter_indices} # {'00': I_qt0_qc0_s0_p00, '01': I_qt0_qc0_s0_p01, ...}
         self.matrix = sp.Matrix([[self.atomics[col] for col in itertools.islice(iter_indices, row*shape[1], row*shape[1]+shape[1])] for row in range(shape[0])]) # [[I_..._p00, I_..._p01], [I_..._p10, I_..._p11]]
         self.ids_matrix_zeros = None
         self.matrix_numeric = None
@@ -129,6 +129,17 @@ class Hadamard_Gate(QuantumGate):
         self.matrix22_t[qubits_t[0]][0] = self.matrix
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
 
+class Hadamard_error_I_Gate(QuantumGate):
+    '''Class of a Hadamard gate, which fails towards identity with varyaing parameter p. 
+    p=0 is 0 error, p=1 means instead of Hadamard Identity is applied.
+    It is a subclass of QuantumGate.'''
+    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
+        super().__init__(name='H_eI', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+        self.matrix_numeric = np.array([[1, 1], [1, -1]])/np.sqrt(2)
+
+        self.matrix22_t[qubits_t[0]][0] = self.matrix
+        self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
+
 class Barrier():
 
     def __init__(self, step: int=0):
@@ -214,7 +225,7 @@ class CX_Gate(QuantumGateMultiQubit):
 class GateCollection():
     '''Class to hold lists of gates of the same type within a single quantum circuit. It is just a helper to make it more easy to traverse the circuit for evaluation.'''
     def __init__(self):
-        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX']
+        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'H_eI']
         self.collections = {id: [] for id in self.allowed_gates}
 
 class QuantumCircuit():
@@ -225,7 +236,7 @@ class QuantumCircuit():
         self.barrier_collection = []
         self.steps = {} # will contain {step_number: [gate1, gate2, ...]}
         self.unitary = None
-        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX']
+        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'H_eI']
 
     def add_gate(self, name:None|str='I', qubits_t: None|list[int]=None, qubits_c: None|list[int]=None, step: None|int=0, gate: QuantumGate|None=None):
         if gate is not None:
@@ -250,7 +261,9 @@ class QuantumCircuit():
                     gate = Hadamard_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'CX':
                     gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                
+                elif name == 'H_eI':
+                    gate = Hadamard_error_I_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+
                 self.gate_collection.collections[name].append(gate)
                 
                 if step not in self.steps:
@@ -407,8 +420,8 @@ class QuantumState():
         if method not in self.allowed_methods:
             raise ValueError('Unknown method')
         if method == 'statevector':
-            symbols = sp.symbols(f'phi:{2**len(self.qubits)}', complex=True, extended_real=False)
-            self.state = sp.Matrix(symbols, shape=(2**len(self.qubits), 1))
+            self.symbols = sp.symbols(f'phi:{2**len(self.qubits)}', complex=True, extended_real=False)
+            self.state = sp.Matrix(self.symbols, shape=(2**len(self.qubits), 1))
             #print(self.state)
             #print(self.state.shape)
             

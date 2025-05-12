@@ -5,8 +5,10 @@ channels:
 
 dependencies:
   - python
-  - numpy
   - sympy
+  - numpy
+  - matplotlib
+  - tqdm
   - openqasm3
   - qiskit
   - qiskit-ibm-runtime
