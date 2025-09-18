@@ -2,9 +2,10 @@ import pathlib
 import sympy as sp
 import itertools
 import numpy as np
-import sympy.physics
-import sympy.physics.quantum
+import sympy.physics as sp_phy
+import sympy.physics.quantum as sp_phy_qant
 import openqasm3
+import copy
 
 
 class QuantumGate:
@@ -13,7 +14,8 @@ class QuantumGate:
     Lists of qubits and matrices are assumed to be encoded as most significant qubit first, i.e. left and bottom, e.g. |q2 q1 q0⟩ = |q2> kron |q1> kron |q0>, 
     |0 0 1> = (1,0) kron (1,0) kron (0,1) = (0,1,0,0,0,0,0,0).'''
     # We need information about the qubit and step here, because otherwise the atomic symbols could not be distinguished from those of other gates
-    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
+    
+    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, _num_summands_decomposed: int=1):
         self.name = name
         self.shape = shape
         iter_indices = [str(sub[0])+str(sub[1]) for sub in itertools.product(range(shape[0]), range(shape[1]))] # (2,2) -> ['00', '01', '10', '11']
@@ -27,7 +29,7 @@ class QuantumGate:
         self.qubits_t = qubits_t
         self.qubits_c = qubits_c
         self.step = step
-        self.num_summands_decomposed = 1
+        self.num_summands_decomposed = _num_summands_decomposed
         self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
         self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c} if qubits_c is not None else None
         self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
@@ -43,20 +45,33 @@ class QuantumGate:
     def items(self):
         return self.__iter__()
 
+class QuantumGateParameterized(QuantumGate):
+    '''Base class for parameterized quantum gates. It holds information of the operation that is applied to the qubit(s).
+      It is a subclass of QuantumGate, and uses an additional symbolic matrix.'''
+    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, _num_summands_decomposed: int=1):
+        super().__init__(name, shape, qubits_t, qubits_c, step, _num_summands_decomposed)
+        self.parameters = None # {name: value, ...}
+        self.matrix_alt = self.matrix.copy()
+        self.matrix22_t_alt = copy.deepcopy(self.matrix22_t) # deepcopy just to be sure that changes in super-class are reflected
+        
+
 class QuantumGateMultiQubit(QuantumGate):
     '''Base class for multi-qubit quantum gates. It holds information of the operation that is applied to the qubits. It is a subclass of QuantumGate,
       and uses a different way to initialize self.matrix'''
-    def __init__(self, name: str='', shape:tuple[int,int]=[4,4], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
-        super().__init__(name, shape, qubits_t, qubits_c, step)
+
+
+    def __init__(self, name: str='', shape:tuple[int,int]=[4,4], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, _num_summands_decomposed: int=2):
+        super().__init__(name, shape, qubits_t, qubits_c, step, _num_summands_decomposed)
         self.atomics = None
         self.matrix = None
-        self.matrix_numeric = None
+        #self.matrix_numeric = None
+        #self.num_summands_decomposed = self._num_summands_decomposed
+        #self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        #self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
+        #self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        #self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
 
-        self.num_summands_decomposed = 2
-        self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
-        self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
-        self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
-        self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
+        
             
 
 
@@ -131,7 +146,7 @@ class Hadamard_Gate(QuantumGate):
 
 class Hadamard_error_I_Gate(QuantumGate):
     '''Class of a Hadamard gate, which fails towards identity with varyaing parameter p. 
-    p=0 is 0 error, p=1 means instead of Hadamard Identity is applied.
+    p=0 is 0 error, p=1 means instead of Hadamard Identity is applied. Numeric gates are equal to Hadamard gate as intented way to use is to replace symbolic values.
     It is a subclass of QuantumGate.'''
     def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
         super().__init__(name='H_eI', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
@@ -139,6 +154,21 @@ class Hadamard_error_I_Gate(QuantumGate):
 
         self.matrix22_t[qubits_t[0]][0] = self.matrix
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
+
+class U_Gate(QuantumGateParameterized):
+    '''Class of the OpenQasm3 built-in U gate. It is a subclass of QuantumGate. https://openqasm.com/language/gates.html#built-in-gates 
+    parameters must be a dict: {'theta': val, 'phi': val, 'lambda': val}'''
+    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        super().__init__(name='U', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+        self.parameters = {'theta': parameters['theta'], 'phi': parameters['phi'], 'lambda': parameters['lambda']}
+        self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'theta': 'theta_I_qt0_qc0_s0_p00', ...}
+        self.matrix_alt = sp.Rational(1,2) * sp.Matrix([[1+sp.exp(sp.I*self.atomics_alt['theta'])                                        , -sp.I*sp.exp(sp.I*self.atomics_alt['lambda'])*(1-sp.exp(sp.I*self.atomics_alt['theta']))],
+                                                        [sp.I*sp.exp(sp.I*self.atomics_alt['phi'])*(1-sp.exp(sp.I*self.atomics_alt['theta'])), sp.exp(sp.I*(self.atomics_alt['phi']+self.atomics_alt['lambda']))*(1+sp.exp(sp.I*self.atomics_alt['theta']))]])
+        self.matrix22_t[qubits_t[0]][0] = self.matrix
+        self.matrix22_t_alt = self.matrix_alt
+
+        self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
+        self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric 
 
 class Barrier():
 
@@ -156,12 +186,12 @@ class CX_Gate(QuantumGateMultiQubit):
     For multiple qubits surrounding and/or between c and t qubit, Identity gates are inserted, e.g. for CX_3_c_1_t
     the matrix is I_3⊗|0_c⟩⟨0_c|⊗I_1⊗I_t+I_3⊗|1_c⟩⟨1_c|⊗I_1⊗X_1.'''
     def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0):
-        super().__init__(name='CX', shape=(4,4), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+        super().__init__(name='CX', shape=(4,4), qubits_t=qubits_t, qubits_c=qubits_c, step=step, _num_summands_decomposed=2)
         assert len(qubits_t) == 1, 'CX gate can only be applied to a single target qubit.'
         assert len(qubits_c) == 1, 'CX gate can only be applied to a single control qubit.'
         assert qubits_t[0] != qubits_c[0], 'Control and target qubit must be different.'
 
-        self.num_summands_decomposed = 2
+        #self.num_summands_decomposed = 2
 
         iter_indices_22 = [str(sub[0])+str(sub[1]) for sub in itertools.product(range(2), range(2))] # (2,2) -> ['00', '01', '10', '11']
         iter_name_ext_orig = ['0c', '1c', 'It', 'Xt']
@@ -171,25 +201,20 @@ class CX_Gate(QuantumGateMultiQubit):
         str_qubits_t = ''.join([str(q)+'_' for q in qubits_t])
         str_qubits_c = ''.join([str(q)+'_' for q in qubits_c]) if qubits_c is not None else ''
         self.atomics = {sub: sp.symbols(self.name+nex+'_qt'+str_qubits_t+'qc'+str_qubits_c+'s'+str(step)+'_p'+sub) for nex, sub in zip(iter_name_ext, iter_indices)}
-        #self.atomics22 = {sub: sp.symbols(self.name+nex+'_qt'+str_qubits_t+'qc'+str_qubits_c+'s'+str(step)) for nex, sub in zip(iter_name_ext_orig, iter_indices_22)}
-        #self.matrices22 = {}
-        #atomics_list = list(self.atomics.values())
-        #for i, nex in enumerate(iter_name_ext_orig):
-        #    idx = i*4
-        #    self.matrices22[nex] = sp.Matrix([atomics_list[idx+0:idx+2],atomics_list[idx+2:idx+4]])
+
         del iter_indices_22, iter_name_ext_orig, iter_name_ext, iter_indices, str_qubits_t, str_qubits_c
 
 
         statevec_zero = np.array([[1],[0]], dtype=np.int8)
-        statevec_one = np.array([[0],[1]], dtype=np.int8)
-        densmat_zero = np.kron(statevec_zero, statevec_zero.T)
-        densmat_one = np.kron(statevec_one, statevec_one.T)
+        statevec_one  = np.array([[0],[1]], dtype=np.int8)
+        densmat_zero  = np.kron(statevec_zero, statevec_zero.T)
+        densmat_one   = np.kron(statevec_one, statevec_one.T)
         sym_statevec_zero = sp.Matrix([[1],[0]])
-        sym_statevec_one = sp.Matrix([[0],[1]])
-        sym_densmat_zero = sp.physics.quantum.TensorProduct(sym_statevec_zero, sym_statevec_zero.transpose())
-        sym_densmat_one = sp.physics.quantum.TensorProduct(sym_statevec_one, sym_statevec_one.transpose())
+        sym_statevec_one  = sp.Matrix([[0],[1]])
+        sym_densmat_zero  = sp_phy_qant.TensorProduct(sym_statevec_zero, sym_statevec_zero.transpose())
+        sym_densmat_one   = sp_phy_qant.TensorProduct(sym_statevec_one, sym_statevec_one.transpose())
         sym_eye_t = _Identity_Gate_in_MQG(name='CX_I', qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-        sym_x_t = _Pauli_X_Gate_in_MQG(name='CX_X', qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+        sym_x_t   =  _Pauli_X_Gate_in_MQG(name='CX_X', qubits_t=qubits_t, qubits_c=qubits_c, step=step)
 
         self.matrix22_t[qubits_t[0]][0] = sym_x_t.matrix
         self.matrix22_c[qubits_c[0]][0] = sym_densmat_one
@@ -202,16 +227,16 @@ class CX_Gate(QuantumGateMultiQubit):
         self.matrix22_c_numeric[qubits_c[0]][1] = densmat_zero
 
         if qubits_c[0] > qubits_t[0]:
-            m1 = sp.physics.quantum.TensorProduct(sym_densmat_one, sym_x_t.matrix)
-            m2 = sp.physics.quantum.TensorProduct(sym_densmat_zero, sym_eye_t.matrix)
+            m1 = sp_phy_qant.TensorProduct(sym_densmat_one, sym_x_t.matrix)
+            m2 = sp_phy_qant.TensorProduct(sym_densmat_zero, sym_eye_t.matrix)
             #display(m1)
             #display(m2)
             self.matrix = m1 + m2
             self.matrix_numeric = np.kron(densmat_one, np.array([[0, 1], [1, 0]],dtype=np.int8)) + np.kron(densmat_zero, np.eye(2,dtype=np.int8))
             # = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0]])
         elif qubits_c[0] < qubits_t[0]:
-            m1 = sp.physics.quantum.TensorProduct(sym_x_t.matrix, sym_densmat_one)
-            m2 = sp.physics.quantum.TensorProduct(sym_eye_t.matrix, sym_densmat_zero)
+            m1 = sp_phy_qant.TensorProduct(sym_x_t.matrix, sym_densmat_one)
+            m2 = sp_phy_qant.TensorProduct(sym_eye_t.matrix, sym_densmat_zero)
             #display(m1)
             #display(m2)
             self.matrix = m1 + m2
@@ -225,7 +250,7 @@ class CX_Gate(QuantumGateMultiQubit):
 class GateCollection():
     '''Class to hold lists of gates of the same type within a single quantum circuit. It is just a helper to make it more easy to traverse the circuit for evaluation.'''
     def __init__(self):
-        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'H_eI']
+        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'H_eI', 'U']
         self.collections = {id: [] for id in self.allowed_gates}
 
 class QuantumCircuit():
@@ -236,9 +261,10 @@ class QuantumCircuit():
         self.barrier_collection = []
         self.steps = {} # will contain {step_number: [gate1, gate2, ...]}
         self.unitary = None
-        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'H_eI']
+        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'H_eI', 'U']
 
-    def add_gate(self, name:None|str='I', qubits_t: None|list[int]=None, qubits_c: None|list[int]=None, step: None|int=0, gate: QuantumGate|None=None):
+
+    def add_gate(self, name:None|str='I', qubits_t: None|list[int]=None, qubits_c: None|list[int]=None, step: None|int=0, gate: QuantumGate|None=None, parameters: dict|None=None):
         if gate is not None:
             raise ValueError('Providing a gate object is not yet implemented.')
         if qubits_t is None or qubits_t == []:
@@ -263,6 +289,8 @@ class QuantumCircuit():
                     gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'H_eI':
                     gate = Hadamard_error_I_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'U':
+                    gate = U_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
 
                 self.gate_collection.collections[name].append(gate)
                 
@@ -282,9 +310,9 @@ class QuantumCircuit():
     #    _unitary = None
     #    for q in self.qubits:
     #        if q not in gates[0].qubits[0]:
-    #            _unitary = sp.physics.quantum.TensorProduct(_unitary, sp.eye(2)) if _unitary is not None else sp.eye(2)
+    #            _unitary = sp_phy_qant.TensorProduct(_unitary, sp.eye(2)) if _unitary is not None else sp.eye(2)
     #        elif q in gates[0].qubits[0]:
-    #            _unitary = sp.physics.quantum.TensorProduct(_unitary, gates[0].matrix) if _unitary is not None else gates[0].matrix
+    #            _unitary = sp_phy_qant.TensorProduct(_unitary, gates[0].matrix) if _unitary is not None else gates[0].matrix
     #    return _unitary
     
     #def extend_by_identities(self, gates: tuple[QuantumGate]):
@@ -312,17 +340,17 @@ class QuantumCircuit():
     #                    else:
     #                        _tmp0 = sp.eye(2)
     #                        _tmp1 = sp.eye(2)
-    #                    _u0 = sp.physics.quantum.TensorProduct(_u0, _tmp0) if _u0 is not None else _tmp0
-    #                    _u1 = sp.physics.quantum.TensorProduct(_u1, _tmp1) if _u1 is not None else _tmp1
+    #                    _u0 = sp_phy_qant.TensorProduct(_u0, _tmp0) if _u0 is not None else _tmp0
+    #                    _u1 = sp_phy_qant.TensorProduct(_u1, _tmp1) if _u1 is not None else _tmp1
     #                return _u0 + _u1
     #            else: 
     #                raise ValueError('Something went wrong.')
     #        elif len(self.qubits) > len(gates[0].qubits_c+gates[0].qubits_t):
     #            for q in self.qubits:
     #                if q not in gates[0].qubits:
-    #                    _unitary = sp.physics.quantum.TensorProduct(_unitary, sp.eye(2)) if _unitary is not None else sp.eye(2)
+    #                    _unitary = sp_phy_qant.TensorProduct(_unitary, sp.eye(2)) if _unitary is not None else sp.eye(2)
     #                else:
-    #                    _unitary = sp.physics.quantum.TensorProduct(_unitary, gates[0].matrix) if _unitary is not None else gates[0].matrix
+    #                    _unitary = sp_phy_qant.TensorProduct(_unitary, gates[0].matrix) if _unitary is not None else gates[0].matrix
     #            return _unitary
     #    elif len(gates) > 1:
     #        gates_sorted_by_qubits = sorted(gates, key=lambda x: x.qubits[0])
@@ -331,13 +359,13 @@ class QuantumCircuit():
     #        for q in self.qubits:
     #            if q not in qubits_gates:
     #                print(f'qubit {q} not in gates')
-    #                _unitary = sp.physics.quantum.TensorProduct(_unitary, sp.eye(2)) if _unitary is not None else sp.eye(2)
+    #                _unitary = sp_phy_qant.TensorProduct(_unitary, sp.eye(2)) if _unitary is not None else sp.eye(2)
     #            elif q in qubits_gates:
     #                for gate in gates_sorted_by_qubits:
     #                    print('gate:', gate.name, 'qubits:', gate.qubits)
     #                    if q in gate.qubits[0]:
     #                        print('    gate:', gate.name, 'qubits:', gate.qubits)
-    #                        _unitary = sp.physics.quantum.TensorProduct(_unitary, gate.matrix) if _unitary is not None else gate.matrix
+    #                        _unitary = sp_phy_qant.TensorProduct(_unitary, gate.matrix) if _unitary is not None else gate.matrix
     #            else:
     #                raise ValueError('Something went wrong.')
     #
@@ -370,7 +398,7 @@ class QuantumCircuit():
                 _tmp_unitary = gates[0]
                 for j in range(1, len(gates)):
                     #print(j, gates[j])
-                    _tmp_unitary = sp.physics.quantum.TensorProduct(_tmp_unitary, gates[j])
+                    _tmp_unitary = sp_phy_qant.TensorProduct(_tmp_unitary, gates[j])
                 #display(_tmp_unitary)
                 unitary_step += _tmp_unitary
             self.unitary = unitary_step @ self.unitary
@@ -437,7 +465,7 @@ class QuantumState():
                 if q == len(self.qubits)-1:
                     self.state = sp.Matrix([1-v, v], shape=(2, 1))
                 else:
-                    self.state = sp.physics.quantum.TensorProduct(self.state, sp.Matrix([1-v, v], shape=(2, 1)))
+                    self.state = sp_phy_qant.TensorProduct(self.state, sp.Matrix([1-v, v], shape=(2, 1)))
 
 
     
@@ -487,7 +515,8 @@ def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program, qc: QuantumCircuit,
             #print('Quantum gate name:', qgate_name)
             #print('Quantum gate qubits names:', qgate_qbit_names)
             #print('Quantum gate qubits indices:', qgate_qbit_indices)
-            qc_gate_name = _map_qasmgatename_to_qcgatename(qgate_name)
+            #qc_gate_name = _map_qasmgatename_to_qcgatename(qgate_name)
+            qc_gate_name = gate_name_mapping_qasm_qc[qgate_name]
             if len (qgate_qbit_indices) == 1: # single qubit gate
                 qc.add_gate(name=qc_gate_name, qubits_t=qgate_qbit_indices, step=timestep)
             elif len (qgate_qbit_indices) == 2: # single qubit gate
