@@ -7,6 +7,7 @@ import sympy.physics.quantum as sp_phy_qant
 import openqasm3
 import copy
 from typing import Literal, Mapping, Iterable
+import functools
 
 
 class QuantumGate:
@@ -16,7 +17,7 @@ class QuantumGate:
     |0 0 1> = (1,0) kron (1,0) kron (0,1) = (0,1,0,0,0,0,0,0).'''
     # We need information about the qubit and step here, because otherwise the atomic symbols could not be distinguished from those of other gates
     
-    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, _num_summands_decomposed: int=1):
+    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
         self.name = name
         self.shape = shape
         iter_indices = [str(sub[0])+str(sub[1]) for sub in itertools.product(range(shape[0]), range(shape[1]))] # (2,2) -> ['00', '01', '10', '11']
@@ -30,7 +31,7 @@ class QuantumGate:
         self.qubits_t = qubits_t
         self.qubits_c = qubits_c
         self.step = step
-        self.num_summands_decomposed = _num_summands_decomposed
+        self.num_summands_decomposed = num_summands_decomposed
         self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
         self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c} if qubits_c is not None else None
         self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
@@ -49,8 +50,8 @@ class QuantumGate:
 class QuantumGateParameterized(QuantumGate):
     '''Base class for parameterized quantum gates. It holds information of the operation that is applied to the qubit(s).
       It is a subclass of QuantumGate, and uses an additional symbolic matrix.'''
-    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, _num_summands_decomposed: int=1):
-        super().__init__(name, shape, qubits_t, qubits_c, step, _num_summands_decomposed)
+    def __init__(self, name: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
+        super().__init__(name, shape, qubits_t, qubits_c, step, num_summands_decomposed)
         self.parameters = None # {name: value, ...}
         self.matrix_alt = self.matrix.copy()
         self.matrix22_t_alt = copy.deepcopy(self.matrix22_t) # deepcopy just to be sure that _alt and non-alt are not linked
@@ -61,8 +62,8 @@ class QuantumGateMultiQubit(QuantumGate):
       and uses a different way to initialize self.matrix'''
 
 
-    def __init__(self, name: str='', shape:tuple[int,int]|None=[4,4], qubits_t: list[int]=[0], qubits_c: list[int]|None=None, step: int=0, _num_summands_decomposed: int|None=2):
-        super().__init__(name, shape, qubits_t, qubits_c, step, _num_summands_decomposed)
+    def __init__(self, name: str='', shape:tuple[int,int]|None=[4,4], qubits_t: list[int]=[0], qubits_c: list[int]|None=None, step: int=0, num_summands_decomposed: int|None=2):
+        super().__init__(name, shape, qubits_t, qubits_c, step, num_summands_decomposed)
         self.atomics = None
         self.matrix = None
         #self.matrix_numeric = None
@@ -87,7 +88,8 @@ class QuantumGateMultiQubit_new(QuantumGate):
         assert len(qubits_c) == len(control_values_c)
         assert set(qubits_t).isdisjoint(set(qubits_c)) if qubits_c is not None else True
         
-        super().__init__(name=name, shape=_shape, qubits_t=qubits_t, qubits_c=qubits_c, step=step, _num_summands_decomposed=_num_summands_decomposed)
+        super().__init__(name=name, shape=_shape, qubits_t=qubits_t, qubits_c=qubits_c, step=step, num_summands_decomposed=_num_summands_decomposed)
+        del _shape, _num_summands_decomposed
         ####
         ## Redefine atomics
         ####
@@ -136,8 +138,10 @@ class QuantumGateMultiQubit_new(QuantumGate):
             _merged_matrix22         = self.matrix22_t | self.matrix22_c
             _merged_matrix22_numeric = self.matrix22_t_numeric | self.matrix22_c_numeric
 
-            self.matrix         = sp.Add(*[sp_phy_qant.TensorProduct(*[_merged_matrix22[k][i]         for k in sorted(_merged_matrix22.keys(),         reverse=True)]) for i in range(self.num_summands_decomposed)])
-            self.matrix_numeric =    sum( [                  np.kron(*[_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
+            
+            self.matrix_decomposed = sp.Add(*[sp_phy_qant.TensorProduct(*[_merged_matrix22[k][i]         for k in sorted(_merged_matrix22.keys(),         reverse=True)]) for i in range(self.num_summands_decomposed)])
+            self.matrix_numeric    =    sum( [ functools.reduce(np.kron, [_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
+            #self.matrix_numeric    =    sum( [                  np.kron(*[_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
         #self.matrix_numeric = None
         #self.num_summands_decomposed = self._num_summands_decomposed
         #self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
@@ -358,7 +362,7 @@ class CX_Gate(QuantumGateMultiQubit):
     For multiple qubits surrounding and/or between c and t qubit, Identity gates are inserted, e.g. for CX_3_c_1_t
     the matrix is I_3⊗|0_c⟩⟨0_c|⊗I_1⊗I_t+I_3⊗|1_c⟩⟨1_c|⊗I_1⊗X_1.'''
     def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0):
-        super().__init__(name='CX', shape=(4,4), qubits_t=qubits_t, qubits_c=qubits_c, step=step, _num_summands_decomposed=2)
+        super().__init__(name='CX', shape=(4,4), qubits_t=qubits_t, qubits_c=qubits_c, step=step, num_summands_decomposed=2)
         assert len(qubits_t) == 1, 'CX gate can only be applied to a single target qubit.'
         assert len(qubits_c) == 1, 'CX gate can only be applied to a single control qubit.'
         assert qubits_t[0] != qubits_c[0], 'Control and target qubit must be different.'
@@ -424,12 +428,29 @@ class CX_Gate_new(QuantumGateMultiQubit_new):
         super().__init__(name='CX_new', qubits_t=qubits_t, qubits_c=qubits_c, step=step,
                          gates_t={qubits_t[0]: ('I','X')}, control_values_c={qubits_c[0]:(0,1)})
 
+class CCX_Gate_new(QuantumGateMultiQubit_new):
+    def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0):
+        assert len(qubits_t) == 1, 'CCX gate can only be applied to a single target qubit.'
+        assert len(qubits_c) == 2, 'CCX gate must be applied to two control qubits.'
+        assert qubits_t[0] not in qubits_c, 'Control and target qubits must be different.'
+        super().__init__(name='CCX_new', qubits_t=qubits_t, qubits_c=qubits_c, step=step,
+                         gates_t={qubits_t[0]: ('I','I','I','X')}, control_values_c={qubits_c[0]:(0,0,1,1), qubits_c[1]:(0,1,0,1)})
+
+class CCXX_Gate_new(QuantumGateMultiQubit_new):
+    def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0):
+        assert len(qubits_t) == 2, 'CCXX gate can only be applied to two target qubits.'
+        assert len(qubits_c) == 2, 'CCXX gate must be applied to two control qubits.'
+        assert qubits_t[0] not in qubits_c, 'Control and target qubits must be different.'
+        super().__init__(name='CCXX_new', qubits_t=qubits_t, qubits_c=qubits_c, step=step,
+                         gates_t={qubits_t[0]: ('I','I','I','X'), qubits_t[1]: ('I','I','I','X')}, 
+                         control_values_c={qubits_c[0]:(0,0,1,1), qubits_c[1]:(0,1,0,1)})
+
 
 
 class GateCollection():
     '''Class to hold lists of gates of the same type within a single quantum circuit. It is just a helper to make it more easy to traverse the circuit for evaluation.'''
     def __init__(self):
-        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'CX_new', 'H_eI', 'U', 'GP', 'P']
+        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'CX_new', 'H_eI', 'U', 'GP', 'P', 'CCX_new', 'CCXX_new']
         self.collections = {id: [] for id in self.allowed_gates}
 
 class QuantumCircuit():
@@ -440,7 +461,7 @@ class QuantumCircuit():
         self.barrier_collection = []
         self.steps = {} # will contain {step_number: [gate1, gate2, ...]}
         self.unitary = None
-        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'CX_new', 'H_eI', 'U', 'GP', 'P']
+        self.allowed_gates = ['I', 'X', 'Y', 'Z', 'H', 'CX', 'CX_new', 'H_eI', 'U', 'GP', 'P', 'CCX_new', 'CCXX_new']
 
 
     def add_gate(self, name:None|str='I', qubits_t: None|list[int]=None, qubits_c: None|list[int]=None, step: None|int=0, gate: QuantumGate|None=None, parameters: dict|None=None):
@@ -468,6 +489,10 @@ class QuantumCircuit():
                     gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'CX_new':
                     gate = CX_Gate_new(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CCX_new':
+                    gate = CCX_Gate_new(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CCXX_new':
+                    gate = CCXX_Gate_new(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'H_eI':
                     gate = Hadamard_error_I_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'U':
@@ -569,12 +594,16 @@ class QuantumCircuit():
                 gates = [None]*len(self.qubits)
                 for gate in gates_step:
                     if gate.num_summands_decomposed >= i:
-                        q_t = gate.qubits_t[0]
-                        gates[q_t] = gate.matrix22_t[q_t][i]
+                        #q_t = gate.qubits_t[0]
+                        #gates[q_t] = gate.matrix22_t[q_t][i]
+                        for q_t in gate.qubits_t:
+                            gates[q_t] = gate.matrix22_t[q_t][i]
                         #print(gates[q_t])
                         if gate.qubits_c is not None:
-                            q_c = gate.qubits_c[0]
-                            gates[q_c] = gate.matrix22_c[q_c][i]
+                            #q_c = gate.qubits_c[0]
+                            #gates[q_c] = gate.matrix22_c[q_c][i]
+                            for q_c in gate.qubits_c:
+                                gates[q_c] = gate.matrix22_c[q_c][i]
                 for j in range(len(gates)):
                     if gates[j] is None:
                         #gates[j] = Identity_Gate(qubits_t=[j], qubits_c=None, step=step).matrix22_t[j][0]
@@ -663,14 +692,14 @@ class QuantumCircuit():
         for gate_type, gates in self.gate_collection.collections.items():
             for gate in gates:
                 for i in range(gate.num_summands_decomposed):
-                    symbs_t = gate.matrix22_t[gate.qubits_t[0]][i].flat()
-                    nums_t = gate.matrix22_t_numeric[gate.qubits_t[0]][i].flatten()
+                    symbs_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t[q_t][i].flat()]
+                    nums_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t_numeric[q_t][i].flatten()]
                     for s, n in zip(symbs_t, nums_t):
                         self.unitary_numeric = self.unitary_numeric.subs(s, n)
                     
                     if gate.qubits_c is not None:
-                        symbs_c = gate.matrix22_c[gate.qubits_c[0]][i].flat() 
-                        nums_c = gate.matrix22_c_numeric[gate.qubits_c[0]][i].flatten()
+                        symbs_c = [e for q_c in gate.qubits_c for e in gate.matrix22_c[q_c][i].flat()]
+                        nums_c = [e for q_c in gate.qubits_c for e in gate.matrix22_c_numeric[q_c][i].flatten()]
                         for s, n in zip(symbs_c, nums_c):
                             self.unitary_numeric = self.unitary_numeric.subs(s, n)
     
