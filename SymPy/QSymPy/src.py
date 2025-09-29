@@ -9,6 +9,8 @@ import copy
 from typing import Literal, Mapping, Iterable
 import functools
 
+from .src_qubit_qreg import QBit, CBit, QReg, CReg
+
 KNOWN_GATES_CLASSES = {} # will be set at the end of the file (end of the import of QSymPy), when all gate classes are defined. Uses QuantumGate.__subclasses__()
 
 class QuantumGate:
@@ -398,7 +400,7 @@ class GateCollection(QuantumGate):
         self.known_gates = KNOWN_GATES_CLASSES
         self.collections = {id: [] for id in self.known_gates}
 
-class QuantumCircuit(GateCollection):
+class QuantumCircuit():
     def __init__(self, num_qubits: int=1, num_clbits: int=1):
         self.qubits = list(reversed(list(range(num_qubits))))
         self.clbits = list(reversed(list(range(num_clbits))))
@@ -724,3 +726,31 @@ print('Known gates:')
 for k,v in KNOWN_GATES_CLASSES.items():
     print(' -', k, ':\t', v)
 del _known_gates_classes
+
+OPENQASM3_TO_QSYMPY = {
+    'p': P_Gate,
+    'x': Pauli_X_Gate,
+    'y': Pauli_Y_Gate,
+    'z': Pauli_Z_Gate,
+    'h': Hadamard_Gate,
+    's': None,
+    'sdg': None,
+    't': None,
+    'tdg': None,
+    'sx': None,
+    'rx': None,
+    'ry': None,
+    'rz': None,
+    'cx': CX_Gate_new,
+    'cy': None,
+    'cz': None,
+    'cp': None,
+    'crx': None,
+    'cry': None,
+    'crz': None,
+    'ch': None,
+    'swap': None,
+    'ccx': CCX_Gate_new,
+    'cswap': None,
+    'cu': None
+    }
