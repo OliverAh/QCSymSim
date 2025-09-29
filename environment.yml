@@ -16,3 +16,4 @@ dependencies:
   - ipykernel
   - pylatexenc
   - pytest
+  - pytest-cov
