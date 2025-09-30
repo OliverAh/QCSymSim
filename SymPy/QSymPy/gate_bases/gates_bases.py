@@ -1,0 +1,168 @@
+import numpy as np
+import itertools
+import sympy as sp
+import sympy.physics.quantum as sp_phy_qant
+from typing import Iterable, Mapping
+import copy
+import functools
+
+def get_known_gates_classes():
+    '''Returns a dictionary of gates and their respective classes, that can be used for circuits.
+    They are determined by looking for subclasses of QuantumGate.
+    Additionally, they have the attribute is_should_be_listed_in_gate_collection = True.'''
+    _known_gates_classes = [cls for cls in QuantumGate.__subclasses__()]
+    _known_gates_classes.extend(scls for cls in _known_gates_classes for scls in cls.__subclasses__() if scls is not None)
+    _known_gates_classes = [cls for cls in _known_gates_classes if getattr(cls, 'is_should_be_listed_in_gate_collection', False)]
+    
+    _known_gates_classes = {cls.name_gate_collection: cls for cls in _known_gates_classes}
+    # print('Known gates:')
+    # for k,v in _known_gates_classes.items():
+        # print(' -', k, ':\t', v)
+    return _known_gates_classes
+
+class QuantumGate:
+    '''Base class for quantum gates. It holds information of the operation that is applied to the qubit(s).
+    It does not hold the matrix for the whole quantum circuit, but just for the qubit(s) it's supposed to change the state of.
+    Lists of qubits and matrices are assumed to be encoded as most significant qubit first, i.e. left and bottom, e.g. |q2 q1 q0⟩ = |q2> kron |q1> kron |q0>, 
+    |0 0 1> = (1,0) kron (1,0) kron (0,1) = (0,1,0,0,0,0,0,0).'''
+    # We need information about the qubit and step here, because otherwise the atomic symbols could not be distinguished from those of other gates
+    is_should_be_listed_in_gate_collection = False
+    
+    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
+        self.name = name
+        self.name_short = name_short
+        self.shape = shape
+        print(self.shape)
+        iter_indices = [str(sub[0])+str(sub[1]) for sub in itertools.product(range(shape[0]), range(shape[1]))] # (2,2) -> ['00', '01', '10', '11']
+        str_qubits_t = ''.join([str(q)+'' for q in qubits_t])
+        str_qubits_c = ''.join([str(q)+'' for q in qubits_c]) if qubits_c is not None else ''
+        self.atomics = {sub: sp.symbols(self.name+'_qt'+str_qubits_t+'_qc'+str_qubits_c+'_s'+str(step)+'_p'+str(sub[0])+str(sub[1])) for sub in iter_indices} # {'00': I_qt0_qc0_s0_p00, '01': I_qt0_qc0_s0_p01, ...}
+        self.matrix = sp.Matrix([[self.atomics[col] for col in itertools.islice(iter_indices, row*shape[1], row*shape[1]+shape[1])] for row in range(shape[0])]) # [[I_..._p00, I_..._p01], [I_..._p10, I_..._p11]]
+        self.ids_matrix_zeros = None
+        self.matrix_numeric = None
+        self.qubits = [qubits_t] if qubits_c is None else [qubits_t, qubits_c]
+        self.qubits_t = qubits_t
+        self.qubits_c = qubits_c
+        self.step = step
+        self.num_summands_decomposed = num_summands_decomposed
+        self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c} if qubits_c is not None else None
+        self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c} if qubits_c is not None else None
+        
+    #def __dict__(self):
+    #    return {'name:': self.name, 'shape': self.shape, 'atomics': self.atomics, 'matrix': self.matrix, 'qubits': self.qubits, 'step':self.step}
+    #def __repr__(self):
+    #    return self.__dict__().__str__()
+    def __iter__(self):
+        for key in self.__dict__:
+            yield key, getattr(self, key)
+    def items(self):
+        return self.__iter__()
+
+class QuantumGateParameterized(QuantumGate):
+    '''Base class for parameterized quantum gates. It holds information of the operation that is applied to the qubit(s).
+      It is a subclass of QuantumGate, and uses an additional symbolic matrix.'''
+    is_should_be_listed_in_gate_collection = False
+    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
+        super().__init__(name, name_short, shape, qubits_t, qubits_c, step, num_summands_decomposed)
+        self.parameters = None # {name: value, ...}
+        self.matrix_alt = self.matrix.copy()
+        self.matrix22_t_alt = copy.deepcopy(self.matrix22_t) # deepcopy just to be sure that _alt and non-alt are not linked
+        
+
+class QuantumGateMultiQubit(QuantumGate):
+    '''Base class for multi-qubit quantum gates. It holds information of the operation that is applied to the qubits. It is a subclass of QuantumGate,
+      and uses a different way to initialize self.matrix'''
+    is_should_be_listed_in_gate_collection = False
+    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]|None=[4,4], qubits_t: list[int]=[0], qubits_c: list[int]|None=None, step: int=0, num_summands_decomposed: int|None=2):
+        super().__init__(name, name_short, shape, qubits_t, qubits_c, step, num_summands_decomposed)
+        self.atomics = None
+        self.matrix = None
+        #self.matrix_numeric = None
+        #self.num_summands_decomposed = self._num_summands_decomposed
+        #self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        #self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
+        #self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        #self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
+
+class QuantumGateMultiQubit_new(QuantumGate):
+    '''Base class for multi-qubit quantum gates. It holds information of the operation that is applied to the qubits. It is a subclass of QuantumGate,
+      and uses a different way to initialize self.matrix'''
+    is_should_be_listed_in_gate_collection = False
+    def __init__(self, name: str='', name_short: str='', qubits_t: Iterable[int]=[0], qubits_c: Iterable[int]|None=None, step: int=0, 
+                 gates_t: Mapping[int,Iterable[str]]=None, control_values_c: Mapping[int,Iterable[int]]|None=None):
+        _shape = 2**(len(qubits_t) + (len(qubits_c) if qubits_c is not None else 0))
+        _shape = (_shape, _shape)
+        _num_summands_decomposed = len(gates_t[qubits_t[0]])
+        assert len(qubits_t) == len(gates_t)
+        assert all([len(gt) == _num_summands_decomposed for gt in gates_t.values()])
+        assert len(qubits_c) == len(control_values_c)
+        assert set(qubits_t).isdisjoint(set(qubits_c)) if qubits_c is not None else True
+        
+        super().__init__(name=name, name_short=name_short, shape=_shape, qubits_t=qubits_t, qubits_c=qubits_c, step=step, num_summands_decomposed=_num_summands_decomposed)
+        del _shape, _num_summands_decomposed
+        ####
+        ## Redefine atomics
+        ####
+        #_str_qubits_t = ''.join([str(q)+'_' for q in qubits_t])
+        #_str_qubits_c = ''.join([str(q)+'_' for q in qubits_c]) if qubits_c is not None else ''
+        #_iter_indices = [str(a)+str(b) for a,b in itertools.product(range(self.shape[0]), range(self.shape[1]))] # (4,4) -> ['00', '01', '02', '03', '10', '11', '12', '13', ...]
+        #self.atomics = {sub: sp.symbols(self.name+'_qt'+_str_qubits_t+'qc'+_str_qubits_c+'s'+str(step)+'_p'+str(sub[0])+'_'+str(sub[1])) for sub in _iter_indices}
+        #del _str_qubits_t, _str_qubits_c, _iter_indices
+
+        _statevec_zero = np.array([[1],[0]], dtype=np.int8)
+        _statevec_one  = np.array([[0],[1]], dtype=np.int8)
+        _densmat_zero = np.kron(_statevec_zero, _statevec_zero.T)
+        _densmat_one  = np.kron(_statevec_one, _statevec_one.T)
+        _sym_statevec_zero = sp.Matrix([[1],[0]])
+        _sym_statevec_one  = sp.Matrix([[0],[1]])
+        _sym_densmat_zero  = sp_phy_qant.TensorProduct(_sym_statevec_zero, _sym_statevec_zero.transpose())
+        _sym_densmat_one   = sp_phy_qant.TensorProduct(_sym_statevec_one, _sym_statevec_one.transpose())
+        _dict_sym_densmats = {0: _sym_densmat_zero, 1: _sym_densmat_one}
+        _dict_num_densmats = {0: _densmat_zero,     1: _densmat_one}
+        ###
+        # Overwrite matrix22_...
+        ###
+        _qubits_c = [] if qubits_c is None else qubits_c
+        #_sym_gates_t = {qt: [_get_gate_class_from_name(vv)(name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step) for vv in v] for qt, v in gates_t.items()}
+        known_gates_classes = get_known_gates_classes()
+        print('here')
+        print(known_gates_classes)
+        _sym_gates_t = {qt: [known_gates_classes[vv](name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step) for vv in v] for qt, v in gates_t.items()}
+        #self.matrix22_t         = {k: _get_gate_class_from_name(v)(name=name+'_'+v, qubits_t=[k], qubits_c=[], step=step) for k,v in gates_t.values()}
+        self.matrix22_t         = {k: [vv.matrix         for vv in v] for k,v in _sym_gates_t.items()}
+        self.matrix22_t_numeric = {k: [vv.matrix_numeric for vv in v]for k,v in _sym_gates_t.items()}
+        
+        _control_values_c = None
+        if qubits_c is None or len(qubits_c)==0 and control_values_c is None:
+            pass
+        elif qubits_c is not None and control_values_c is None:
+            #_control_values_c = {qc: [1]*self.num_summands_decomposed for qc in qubits_c} # if no control values are given, assume all 1s
+            raise ValueError('If control qubits are given, control values MUST be given as well.')
+        elif qubits_c is not None and control_values_c is not None:
+            _control_values_c = control_values_c
+        else:
+            raise ValueError('If control values are given, control qubits MUST be given as well.')
+
+        if qubits_c is None:
+            pass
+        else:
+            self.matrix22_c         = {qc: [_dict_sym_densmats[qcvv] for qcvv in qcv] for qc, qcv in _control_values_c.items()}
+            self.matrix22_c_numeric = {qc: [_dict_num_densmats[qcvv] for qcvv in qcv] for qc, qcv in _control_values_c.items()} 
+            
+            _merged_matrix22         = self.matrix22_t | self.matrix22_c
+            _merged_matrix22_numeric = self.matrix22_t_numeric | self.matrix22_c_numeric
+
+            
+            self.matrix_decomposed = sp.Add(*[sp_phy_qant.TensorProduct(*[_merged_matrix22[k][i]         for k in sorted(_merged_matrix22.keys(),         reverse=True)]) for i in range(self.num_summands_decomposed)])
+            self.matrix_numeric    =    sum( [ functools.reduce(np.kron, [_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
+            #self.matrix_numeric    =    sum( [                  np.kron(*[_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
+        #self.matrix_numeric = None
+        #self.num_summands_decomposed = self._num_summands_decomposed
+        #self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        #self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
+        #self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
+        #self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
+
+
