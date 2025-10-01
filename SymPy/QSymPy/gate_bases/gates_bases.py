@@ -16,9 +16,9 @@ def get_known_gates_classes() -> dict[str,type]:
     _known_gates_classes = [cls for cls in _known_gates_classes if getattr(cls, 'name_gate_collection', False)]
     
     _known_gates_classes = {cls.name_gate_collection: cls for cls in _known_gates_classes}
-    print('Known gates:')
-    for k,v in _known_gates_classes.items():
-        print(' -', k, ':\t', v)
+    # print('Known gates:')
+    # for k,v in _known_gates_classes.items():
+    #     print(' -', k, ':\t', v)
     return _known_gates_classes
 
 class QuantumGate:
@@ -35,7 +35,6 @@ class QuantumGate:
         self.name = name
         self.name_short = name_short
         self.shape = shape
-        print(self.shape)
         iter_indices = [str(sub[0])+str(sub[1]) for sub in itertools.product(range(shape[0]), range(shape[1]))] # (2,2) -> ['00', '01', '10', '11']
         str_qubits_t = ''.join([str(q)+'' for q in qubits_t])
         str_qubits_c = ''.join([str(q)+'' for q in qubits_c]) if qubits_c is not None else ''
@@ -90,7 +89,7 @@ class QuantumGateMultiQubit(QuantumGate):
         _num_summands_decomposed = len(gates_t[qubits_t[0]])
         assert len(qubits_t) == len(gates_t)
         assert all([len(gt) == _num_summands_decomposed for gt in gates_t.values()])
-        assert len(qubits_c) == len(control_values_c)
+        assert qubits_c is None or len(qubits_c) == len(control_values_c)
         assert set(qubits_t).isdisjoint(set(qubits_c)) if qubits_c is not None else True
         
         # super() will alwas be QuantumGate, also for parameterized gates. parameters are handeled a few line down, similar to the single wubit case
@@ -124,10 +123,6 @@ class QuantumGateMultiQubit(QuantumGate):
         #_sym_gates_t = {qt: [_get_gate_class_from_name(vv)(name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step) for vv in v] for qt, v in gates_t.items()}
         known_gates_classes = get_known_gates_classes()
         _parameters = parameters if parameters is not None else [None]*len(qubits_t)
-        print('here')
-        _l = [[known_gates_classes[vv] for vv in v] for i, (qt, v) in enumerate(gates_t.items())]
-        print(_l)
-        print(_l[0], [issubclass(e, QuantumGateParameterized) for e in _l[0]])
         _sym_gates_t = {qt: [known_gates_classes[vv](name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step, parameters=_parameters[i]) if issubclass(known_gates_classes[vv], QuantumGateParameterized) 
                              else known_gates_classes[vv](name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step)
                              for vv in v] for i, (qt, v) in enumerate(gates_t.items())}
@@ -147,7 +142,8 @@ class QuantumGateMultiQubit(QuantumGate):
             raise ValueError('If control values are given, control qubits MUST be given as well.')
 
         if qubits_c is None:
-            pass
+            _merged_matrix22         = self.matrix22_t
+            _merged_matrix22_numeric = self.matrix22_t_numeric
         else:
             self.matrix22_c         = {qc: [_dict_sym_densmats[qcvv] for qcvv in qcv] for qc, qcv in _control_values_c.items()}
             self.matrix22_c_numeric = {qc: [_dict_num_densmats[qcvv] for qcvv in qcv] for qc, qcv in _control_values_c.items()} 
@@ -156,17 +152,16 @@ class QuantumGateMultiQubit(QuantumGate):
             _merged_matrix22_numeric = self.matrix22_t_numeric | self.matrix22_c_numeric
 
             
-            self.matrix_decomposed = sp.Add(*[sp_phy_qant.TensorProduct(*[_merged_matrix22[k][i]         for k in sorted(_merged_matrix22.keys(),         reverse=True)]) for i in range(self.num_summands_decomposed)])
-            self.matrix_numeric    =    sum( [ functools.reduce(np.kron, [_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
-            #self.matrix_numeric    =    sum( [                  np.kron(*[_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
+        self.matrix_decomposed = sp.Add(*[sp_phy_qant.TensorProduct(*[_merged_matrix22[k][i]         for k in sorted(_merged_matrix22.keys(),         reverse=True)]) for i in range(self.num_summands_decomposed)])
+        self.matrix_numeric    =    sum( [ functools.reduce(np.kron, [_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
+        #self.matrix_numeric    =    sum( [                  np.kron(*[_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
         
         if parameters is not None:
             self.is_parametric = True
             self.parameters = _parameters
             self.atomics_alt = {k: [getattr(vv, 'atomics_alt', None) for vv in v] for k,v in _sym_gates_t.items()}
             self.atomics_alt = {key: [e for e in val if e is not None] for key, val in self.atomics_alt.items()} # keep only non-None entries
-            self.atomics_alt = {key: [vval[key] for vval in val if key in vval] for val in self.atomics_alt.values() for pl in self.parameters for key in pl.keys()}
-            print('self.atomics_alt:', self.atomics_alt)
+            self.atomics_alt = {key: [vval[key] for val in self.atomics_alt.values() for vval in val if key in vval] for pl in self.parameters for key in pl.keys()}
             self.matrix_alt = self.matrix.copy()
             self.matrix22_t_alt = {k: [getattr(vv, 'matrix_alt', None) for vv in v] for k,v in _sym_gates_t.items()}
 
