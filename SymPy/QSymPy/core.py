@@ -61,26 +61,61 @@ class QuantumCircuit():
                     gate = Pauli_Z_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'H':
                     gate = Hadamard_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                elif name == 'CX':
-                    gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'H_eI':
+                    gate = Hadamard_error_I_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'S':
+                    gate = S_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'Sdg':
+                    gate = Sdg_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'T':
+                    gate = T_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'Tdg':
+                    gate = Tdg_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'SX':
+                    gate = SX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'U':
+                    gate = U_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'GP':
+                    gate = GP_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'RX':
+                    gate = RX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'RY':
+                    gate = RY_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'RZ':
+                    gate = RZ_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'P':
+                    gate = P_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
                 elif name == 'CX':
                     gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'CCX':
                     gate = CCX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'CCXX':
                     gate = CCXX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                elif name == 'H_eI':
-                    gate = Hadamard_error_I_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                elif name == 'U':
-                    gate = U_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
-                elif name == 'GP':
-                    gate = GP_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
-                elif name == 'P':
-                    gate = P_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
                 elif name == 'CU':
                     gate = CU_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
                 elif name == 'CUU':
                     gate = CUU_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'CY':
+                    gate = CY_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CZ':
+                    gate = CZ_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CP':
+                    gate = CP_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name =='CRX':
+                    gate = CRX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name =='CRY':
+                    gate = CRY_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name =='CRZ':
+                    gate = CRZ_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'CH':
+                    gate = CH_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'SWAP':
+                    gate = SWAP_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CSWAP':
+                    gate = CSWAP_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                else:
+                    raise ValueError(f'No implementation registered for gate {name}.')
+                                
                 self.gate_collection.collections[name].append(gate)
                 
                 if step not in self.steps:
