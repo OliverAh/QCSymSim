@@ -63,12 +63,12 @@ class QuantumCircuit():
                     gate = Hadamard_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'CX':
                     gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                elif name == 'CX_new':
-                    gate = CX_Gate_new(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                elif name == 'CCX_new':
-                    gate = CCX_Gate_new(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-                elif name == 'CCXX_new':
-                    gate = CCXX_Gate_new(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CX':
+                    gate = CX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CCX':
+                    gate = CCX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+                elif name == 'CCXX':
+                    gate = CCXX_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'H_eI':
                     gate = Hadamard_error_I_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step)
                 elif name == 'U':

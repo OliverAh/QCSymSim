@@ -6,10 +6,11 @@ from typing import Iterable, Mapping
 import copy
 import functools
 
-def get_known_gates_classes():
+def get_known_gates_classes() -> dict[str,type]:
     '''Returns a dictionary of gates and their respective classes, that can be used for circuits.
     They are determined by looking for subclasses of QuantumGate.
-    Additionally, they have the attribute is_should_be_listed_in_gate_collection = True.'''
+    The returned dict is in the form {'CX': type}.
+    '''
     _known_gates_classes = [cls for cls in QuantumGate.__subclasses__()]
     _known_gates_classes.extend(scls for cls in _known_gates_classes for scls in cls.__subclasses__() if scls is not None)
     _known_gates_classes = [cls for cls in _known_gates_classes if getattr(cls, 'is_should_be_listed_in_gate_collection', False)]
@@ -69,24 +70,8 @@ class QuantumGateParameterized(QuantumGate):
         self.parameters = None # {name: value, ...}
         self.matrix_alt = self.matrix.copy()
         self.matrix22_t_alt = copy.deepcopy(self.matrix22_t) # deepcopy just to be sure that _alt and non-alt are not linked
-        
 
 class QuantumGateMultiQubit(QuantumGate):
-    '''Base class for multi-qubit quantum gates. It holds information of the operation that is applied to the qubits. It is a subclass of QuantumGate,
-      and uses a different way to initialize self.matrix'''
-    is_should_be_listed_in_gate_collection = False
-    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]|None=[4,4], qubits_t: list[int]=[0], qubits_c: list[int]|None=None, step: int=0, num_summands_decomposed: int|None=2):
-        super().__init__(name, name_short, shape, qubits_t, qubits_c, step, num_summands_decomposed)
-        self.atomics = None
-        self.matrix = None
-        #self.matrix_numeric = None
-        #self.num_summands_decomposed = self._num_summands_decomposed
-        #self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
-        #self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
-        #self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
-        #self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
-
-class QuantumGateMultiQubit_new(QuantumGate):
     '''Base class for multi-qubit quantum gates. It holds information of the operation that is applied to the qubits. It is a subclass of QuantumGate,
       and uses a different way to initialize self.matrix'''
     is_should_be_listed_in_gate_collection = False
