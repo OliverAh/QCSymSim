@@ -168,7 +168,7 @@ class TestSubs_symbolic_zeros_in_symbolic_unitary:
 
                 #print(f"Unitary for {g0} and {g1}:")
                 qc.assemble_symbolic_unitary()
-                qc.subs_symbolic_zeros_in_symbolic_unitary()
+                qc.subs_symbolic_zerosones_in_symbolic_unitary()
 
                 #print(qc.unitary)
                 

@@ -13,12 +13,12 @@ def get_known_gates_classes() -> dict[str,type]:
     '''
     _known_gates_classes = [cls for cls in QuantumGate.__subclasses__()]
     _known_gates_classes.extend(scls for cls in _known_gates_classes for scls in cls.__subclasses__() if scls is not None)
-    _known_gates_classes = [cls for cls in _known_gates_classes if getattr(cls, 'is_should_be_listed_in_gate_collection', False)]
+    _known_gates_classes = [cls for cls in _known_gates_classes if getattr(cls, 'name_gate_collection', False)]
     
     _known_gates_classes = {cls.name_gate_collection: cls for cls in _known_gates_classes}
-    # print('Known gates:')
-    # for k,v in _known_gates_classes.items():
-        # print(' -', k, ':\t', v)
+    print('Known gates:')
+    for k,v in _known_gates_classes.items():
+        print(' -', k, ':\t', v)
     return _known_gates_classes
 
 class QuantumGate:
@@ -67,10 +67,11 @@ class QuantumGateParameterized(QuantumGate):
     '''Base class for parameterized quantum gates. It holds information of the operation that is applied to the qubit(s).
       It is a subclass of QuantumGate, and uses an additional symbolic matrix.'''
     is_should_be_listed_in_gate_collection = False
-    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
+    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1,
+                 parameters: None|list[dict[str, float]] = None):
         super().__init__(name, name_short, shape, qubits_t, qubits_c, step, num_summands_decomposed)
         self.is_parametric = True
-        self.parameters = None # {name: value, ...}
+        self.parameters = parameters
         self.matrix_alt = self.matrix.copy()
         self.matrix22_t_alt = copy.deepcopy(self.matrix22_t) # deepcopy just to be sure that _alt and non-alt are not linked
 
@@ -162,6 +163,10 @@ class QuantumGateMultiQubit(QuantumGate):
         if parameters is not None:
             self.is_parametric = True
             self.parameters = _parameters
+            self.atomics_alt = {k: [getattr(vv, 'atomics_alt', None) for vv in v] for k,v in _sym_gates_t.items()}
+            self.atomics_alt = {key: [e for e in val if e is not None] for key, val in self.atomics_alt.items()} # keep only non-None entries
+            self.atomics_alt = {key: [vval[key] for vval in val if key in vval] for val in self.atomics_alt.values() for pl in self.parameters for key in pl.keys()}
+            print('self.atomics_alt:', self.atomics_alt)
             self.matrix_alt = self.matrix.copy()
             self.matrix22_t_alt = {k: [getattr(vv, 'matrix_alt', None) for vv in v] for k,v in _sym_gates_t.items()}
 

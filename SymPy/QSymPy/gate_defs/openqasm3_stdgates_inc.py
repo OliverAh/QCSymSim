@@ -28,7 +28,7 @@ class Identity_Gate(QuantumGate):
     '''Class of the identity gate. It is a subclass of QuantumGate.'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'I'
-    def __init__(self,name: str='I', qubits_t: list[int]=[0], qubits_c: list[int]=[0], step: int=0):
+    def __init__(self,name: str='I', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
         super().__init__(name=name, name_short='I', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.matrix_numeric = np.array([[1, 0], [0, 1]])
 
@@ -154,6 +154,7 @@ class U_Gate(QuantumGateParameterized):
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'U'
     def __init__(self, name: str='U', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        assert parameters is not None and all(key in parameters for key in ['theta', 'phi', 'lambda']), "U gate requires parameters: {'theta': val, 'phi': val, 'lambda': val}"
         super().__init__(name=name, name_short='U', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.parameters = {'theta': parameters['theta'], 'phi': parameters['phi'], 'lambda': parameters['lambda']} if parameters is not None else {'theta': None, 'phi': None, 'lambda': None}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'theta': 'theta_U_qt0_qc0_s0_p00', ...}
@@ -171,6 +172,7 @@ class GP_Gate(QuantumGateParameterized):
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'GP'
     def __init__(self, name: str='GP', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        assert parameters is not None and all(key in parameters for key in ['gamma']), "GP gate requires parameters: {'gamma': val}"
         super().__init__(name=name, name_short='GP', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.parameters = {'gamma': parameters['gamma']}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'gamma': 'gamma_GP_qt0_qc0_s0_p00'}
@@ -223,6 +225,7 @@ class RZ_Gate(QuantumGateParameterized):
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'RZ'
     def __init__(self, name: str='RZ', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        assert parameters is not None and all(key in parameters for key in ['lambda']), "RZ gate requires parameters: {'lambda': val}"
         super().__init__(name=name, name_short='RZ', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.parameters = {'lambda': parameters['lambda']} if parameters is not None else {'lambda': None}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'lambda': 'lambda_U_qt0_qc0_s0_p00', ...}
@@ -288,6 +291,7 @@ class U_for_CU_Gate(QuantumGateParameterized):
     is_should_be_listed_in_gate_collection = False
     name_gate_collection = 'U_for_CU_Gate'
     def __init__(self, name: str='U', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        assert parameters is not None and all(key in parameters for key in ['theta', 'phi', 'lambda', 'gamma']), "U_for_CU_Gate requires parameters: {'theta': val, 'phi': val, 'lambda': val, 'gamma': val}"
         super().__init__(name=name, name_short='U',shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
         self.parameters = {'theta': parameters['theta'], 'phi': parameters['phi'], 'lambda': parameters['lambda'], 'gamma': parameters['gamma']} if parameters is not None else {'theta': None, 'phi': None, 'lambda': None, 'gamma': None}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'theta': 'theta_U_qt0_qc0_s0_p00', ...}

@@ -27,7 +27,7 @@ class GateCollection(QuantumGate):
         #_known_gates_classes = [cls for cls in _known_gates_classes if getattr(cls, 'is_should_be_listed_in_gate_collection', False)]
         #self.known_gates = list(dict.fromkeys([cls.name_gate_collection for cls in _known_gates_classes])) # remove possible duplicates and keep order, without order we could do list(set(...))
         self.known_gates = gate_bases.get_known_gates_classes()
-        self.collections = {id: [] for id in self.known_gates}
+        self.collections = {id: [] for id, val in self.known_gates.items() if val.is_should_be_listed_in_gate_collection}
 
 class QuantumCircuit():
     def __init__(self, num_qubits: int=1, num_clbits: int=1):
