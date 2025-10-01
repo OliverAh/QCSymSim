@@ -36,8 +36,8 @@ class Pauli_Y_Gate(QuantumGate):
     '''Class of the Pauli Y gate. It is a subclass of QuantumGate.'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'Y'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
-        super().__init__(name='Y', name_short='Y', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+    def __init__(self, name: str='Y', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
+        super().__init__(name=name, name_short='Y', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.matrix_numeric = np.array([[0, -1j], [1j, 0]])
 
         self.matrix22_t[qubits_t[0]][0] = self.matrix
@@ -47,8 +47,8 @@ class Pauli_Z_Gate(QuantumGate):
     '''Class of the Pauli Z gate. It is a subclass of QuantumGate.'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'Z'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
-        super().__init__(name='Z', name_short='Z', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+    def __init__(self, name: str='Z', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
+        super().__init__(name=name, name_short='Z', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.matrix_numeric = np.array([[1, 0], [0, -1]])
 
         self.matrix22_t[qubits_t[0]][0] = self.matrix
@@ -58,8 +58,8 @@ class Hadamard_Gate(QuantumGate):
     '''Class of the Hadamard gate. It is a subclass of QuantumGate.'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'H'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
-        super().__init__(name='H', name_short='H', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+    def __init__(self, name: str='H', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
+        super().__init__(name=name, name_short='H', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.matrix_numeric = np.array([[1, 1], [1, -1]])/np.sqrt(2)
 
         self.matrix22_t[qubits_t[0]][0] = self.matrix
@@ -71,8 +71,8 @@ class Hadamard_error_I_Gate(QuantumGate):
     It is a subclass of QuantumGate.'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'H_eI'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
-        super().__init__(name='H_eI', name_short='H_eI', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+    def __init__(self, name: str='H_eI', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0):
+        super().__init__(name=name, name_short='H_eI', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.matrix_numeric = np.array([[1, 1], [1, -1]])/np.sqrt(2)
 
         self.matrix22_t[qubits_t[0]][0] = self.matrix
@@ -84,15 +84,14 @@ class U_Gate(QuantumGateParameterized):
     NOTE: There is a difference in the definition between OpenQasm2 and OpenQasm3, OQ3 = e^i(ϕ+λ)/2 OQ2'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'U'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
-        super().__init__(name='U', name_short='U', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
-        self.parameters = {'theta': parameters['theta'], 'phi': parameters['phi'], 'lambda': parameters['lambda']}
+    def __init__(self, name: str='U', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        super().__init__(name=name, name_short='U', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+        self.parameters = {'theta': parameters['theta'], 'phi': parameters['phi'], 'lambda': parameters['lambda']} if parameters is not None else {'theta': None, 'phi': None, 'lambda': None}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'theta': 'theta_U_qt0_qc0_s0_p00', ...}
         self.matrix_alt = sp.Rational(1,2) * sp.Matrix([[1+sp.exp(sp.I*self.atomics_alt['theta'])                                        , -sp.I*sp.exp(sp.I*self.atomics_alt['lambda'])*(1-sp.exp(sp.I*self.atomics_alt['theta']))],
                                                         [sp.I*sp.exp(sp.I*self.atomics_alt['phi'])*(1-sp.exp(sp.I*self.atomics_alt['theta'])), sp.exp(sp.I*(self.atomics_alt['phi']+self.atomics_alt['lambda']))*(1+sp.exp(sp.I*self.atomics_alt['theta']))]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
         self.matrix22_t_alt = [[self.matrix_alt]]
-
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric 
 
@@ -102,8 +101,8 @@ class GP_Gate(QuantumGateParameterized):
     NOTE: There is a difference in the definition between OpenQasm2 and OpenQasm3, OQ3 = e^iγ/2 OQ2'''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'GP'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
-        super().__init__(name='GP', name_short='GP', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+    def __init__(self, name: str='GP', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        super().__init__(name=name, name_short='GP', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.parameters = {'gamma': parameters['gamma']}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'gamma': 'gamma_GP_qt0_qc0_s0_p00'}
         self.matrix_alt = sp.Matrix([[sp.exp(sp.I*self.atomics_alt['gamma']), 0],
@@ -119,8 +118,8 @@ class P_Gate(QuantumGateParameterized):
     parameters must be a dict: {'lambda': val}  '''
     is_should_be_listed_in_gate_collection = True
     name_gate_collection = 'P'
-    def __init__(self, qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
-        super().__init__(name='P', name_short='P', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
+    def __init__(self, name: str='P', qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, parameters: dict=None):
+        super().__init__(name=name, name_short='P', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.parameters = {'lambda': parameters['lambda']}
         self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'lambda': 'lambda_P_qt0_qc0_s0_p00'}
         self.matrix_alt = sp.Matrix([[1, 0],
@@ -171,3 +170,27 @@ class CCXX_Gate(QuantumGateMultiQubit):
         super().__init__(name='CCXX', name_short='CCXX', qubits_t=qubits_t, qubits_c=qubits_c, step=step,
                          gates_t={qubits_t[0]: ('I','I','I','X'), qubits_t[1]: ('I','I','I','X')}, 
                          control_values_c={qubits_c[0]:(0,0,1,1), qubits_c[1]:(0,1,0,1)})
+
+class CU_Gate(QuantumGateMultiQubit):
+    is_should_be_listed_in_gate_collection = True
+    name_gate_collection = 'CU'
+    def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0, parameters: dict=None):
+        assert len(qubits_t) == 1, 'CU gate can only be applied to a single target qubit.'
+        assert len(qubits_c) == 1, 'CU gate can only be applied to a single control qubit.'
+        assert qubits_t[0] != qubits_c[0], 'Control and target qubit must be different.'
+        assert parameters is not None and all([key in parameters.keys() for key in ['theta', 'phi', 'lambda']]), "CU gate needs parameters dict with keys 'theta', 'phi', 'lambda'." 
+        super().__init__(name='CU', name_short='CU', qubits_t=qubits_t, qubits_c=qubits_c, step=step,
+                         gates_t={qubits_t[0]: ('I','U')}, control_values_c={qubits_c[0]:(0,1)},
+                         parameters=[parameters])
+
+class CUU_Gate(QuantumGateMultiQubit):
+    is_should_be_listed_in_gate_collection = True
+    name_gate_collection = 'CUU'
+    def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0, parameters: dict=None):
+        assert len(qubits_t) == 2, 'CUU gate can only be applied to two target qubits.'
+        assert len(qubits_c) == 1, 'CU gate can only be applied to a single control qubit.'
+        assert qubits_c[0] not in qubits_t, 'Control and target qubit must be different.'
+        assert parameters is not None and all([key in ['theta', 'phi', 'lambda'] for p in parameters for key in p.keys()]), "CUU gate needs list of parameters dicts with keys 'theta', 'phi', 'lambda'." 
+        super().__init__(name='CU', name_short='CU', qubits_t=qubits_t, qubits_c=qubits_c, step=step,
+                         gates_t={qubits_t[0]: ('I','U'), qubits_t[1]: ('I','U')}, control_values_c={qubits_c[0]:(0,1)},
+                         parameters=parameters)

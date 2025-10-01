@@ -29,7 +29,9 @@ class QuantumGate:
     # We need information about the qubit and step here, because otherwise the atomic symbols could not be distinguished from those of other gates
     is_should_be_listed_in_gate_collection = False
     
-    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
+    def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1,
+                 parameters: None=None):
+        assert parameters is None, 'Parameters are not supported in the QuantumGate class. Use QuantumGateParameterized instead.'
         self.name = name
         self.name_short = name_short
         self.shape = shape
@@ -50,7 +52,7 @@ class QuantumGate:
         self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c} if qubits_c is not None else None
         self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
         self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c} if qubits_c is not None else None
-        
+        self.is_parametric = False # allows for simpler checking if gate is parameterized or not than isinstance(...) and issubclass(...)
     #def __dict__(self):
     #    return {'name:': self.name, 'shape': self.shape, 'atomics': self.atomics, 'matrix': self.matrix, 'qubits': self.qubits, 'step':self.step}
     #def __repr__(self):
@@ -67,16 +69,21 @@ class QuantumGateParameterized(QuantumGate):
     is_should_be_listed_in_gate_collection = False
     def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1):
         super().__init__(name, name_short, shape, qubits_t, qubits_c, step, num_summands_decomposed)
+        self.is_parametric = True
         self.parameters = None # {name: value, ...}
         self.matrix_alt = self.matrix.copy()
         self.matrix22_t_alt = copy.deepcopy(self.matrix22_t) # deepcopy just to be sure that _alt and non-alt are not linked
 
 class QuantumGateMultiQubit(QuantumGate):
     '''Base class for multi-qubit quantum gates. It holds information of the operation that is applied to the qubits. It is a subclass of QuantumGate,
-      and uses a different way to initialize self.matrix'''
+      ALSO IF IT USES PARAMETERIZED GATES WITHIN. In the latter case parameters can be specified as an additional kwarg in the order the parameterized gates appear,
+      e.g. CUU(..., parameters=[{theta:..., phi:..., lambda:...}, {theta:..., phi:..., lambda:...}])
+      or   CUX(..., parameters=[{theta:..., phi:..., lambda:...}, None|[]]) as X is not parameterized
+      or  CUXU(..., parameters=[{theta:..., phi:..., lambda:...}, None|[], {theta:..., phi:..., lambda:...}]) as X is not parameterized'''
     is_should_be_listed_in_gate_collection = False
     def __init__(self, name: str='', name_short: str='', qubits_t: Iterable[int]=[0], qubits_c: Iterable[int]|None=None, step: int=0, 
-                 gates_t: Mapping[int,Iterable[str]]=None, control_values_c: Mapping[int,Iterable[int]]|None=None):
+                 gates_t: Mapping[int,Iterable[str]]=None, control_values_c: Mapping[int,Iterable[int]]|None=None,
+                 parameters: Iterable[Mapping[str, float]]|None=None):
         _shape = 2**(len(qubits_t) + (len(qubits_c) if qubits_c is not None else 0))
         _shape = (_shape, _shape)
         _num_summands_decomposed = len(gates_t[qubits_t[0]])
@@ -85,8 +92,11 @@ class QuantumGateMultiQubit(QuantumGate):
         assert len(qubits_c) == len(control_values_c)
         assert set(qubits_t).isdisjoint(set(qubits_c)) if qubits_c is not None else True
         
+        # super() will alwas be QuantumGate, also for parameterized gates. parameters are handeled a few line down, similar to the single wubit case
         super().__init__(name=name, name_short=name_short, shape=_shape, qubits_t=qubits_t, qubits_c=qubits_c, step=step, num_summands_decomposed=_num_summands_decomposed)
         del _shape, _num_summands_decomposed
+        self.gates_t = gates_t
+        self.control_values_c = control_values_c
         ####
         ## Redefine atomics
         ####
@@ -112,9 +122,14 @@ class QuantumGateMultiQubit(QuantumGate):
         _qubits_c = [] if qubits_c is None else qubits_c
         #_sym_gates_t = {qt: [_get_gate_class_from_name(vv)(name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step) for vv in v] for qt, v in gates_t.items()}
         known_gates_classes = get_known_gates_classes()
+        _parameters = parameters if parameters is not None else [None]*len(qubits_t)
         print('here')
-        print(known_gates_classes)
-        _sym_gates_t = {qt: [known_gates_classes[vv](name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step) for vv in v] for qt, v in gates_t.items()}
+        _l = [[known_gates_classes[vv] for vv in v] for i, (qt, v) in enumerate(gates_t.items())]
+        print(_l)
+        print(_l[0], [issubclass(e, QuantumGateParameterized) for e in _l[0]])
+        _sym_gates_t = {qt: [known_gates_classes[vv](name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step, parameters=_parameters[i]) if issubclass(known_gates_classes[vv], QuantumGateParameterized) 
+                             else known_gates_classes[vv](name=name+'_'+vv, qubits_t=[qt], qubits_c=_qubits_c, step=step)
+                             for vv in v] for i, (qt, v) in enumerate(gates_t.items())}
         #self.matrix22_t         = {k: _get_gate_class_from_name(v)(name=name+'_'+v, qubits_t=[k], qubits_c=[], step=step) for k,v in gates_t.values()}
         self.matrix22_t         = {k: [vv.matrix         for vv in v] for k,v in _sym_gates_t.items()}
         self.matrix22_t_numeric = {k: [vv.matrix_numeric for vv in v]for k,v in _sym_gates_t.items()}
@@ -143,11 +158,10 @@ class QuantumGateMultiQubit(QuantumGate):
             self.matrix_decomposed = sp.Add(*[sp_phy_qant.TensorProduct(*[_merged_matrix22[k][i]         for k in sorted(_merged_matrix22.keys(),         reverse=True)]) for i in range(self.num_summands_decomposed)])
             self.matrix_numeric    =    sum( [ functools.reduce(np.kron, [_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
             #self.matrix_numeric    =    sum( [                  np.kron(*[_merged_matrix22_numeric[k][i] for k in sorted(_merged_matrix22_numeric.keys(), reverse=True)]) for i in range(self.num_summands_decomposed)])
-        #self.matrix_numeric = None
-        #self.num_summands_decomposed = self._num_summands_decomposed
-        #self.matrix22_t = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
-        #self.matrix22_c = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
-        #self.matrix22_t_numeric = {q_t: [None]*self.num_summands_decomposed for q_t in qubits_t}
-        #self.matrix22_c_numeric = {q_c: [None]*self.num_summands_decomposed for q_c in qubits_c}
-
+        
+        if parameters is not None:
+            self.is_parametric = True
+            self.parameters = _parameters
+            self.matrix_alt = self.matrix.copy()
+            self.matrix22_t_alt = {k: [getattr(vv, 'matrix_alt', None) for vv in v] for k,v in _sym_gates_t.items()}
 

@@ -77,7 +77,10 @@ class QuantumCircuit():
                     gate = GP_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
                 elif name == 'P':
                     gate = P_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
-
+                elif name == 'CU':
+                    gate = CU_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
+                elif name == 'CUU':
+                    gate = CUU_Gate(qubits_t=qubits_t, qubits_c=qubits_c, step=step, parameters=parameters)
                 self.gate_collection.collections[name].append(gate)
                 
                 if step not in self.steps:
@@ -127,24 +130,26 @@ class QuantumCircuit():
                 unitary_step += _tmp_unitary
             self.unitary = unitary_step @ self.unitary
     
-    def subs_symbolic_zeros_in_symbolic_unitary(self):
+    def subs_symbolic_zerosones_in_symbolic_unitary(self, zeros: bool=True, ones: bool=True):
         '''Substitute entries in the symbolic unitary that are zero with zeros.'''
         # this function based create_numeric_unitary_from_symbolic, so if making changes to either you might want to adapt the other as well 
         for gate_type, gates in self.gate_collection.collections.items():
             for gate in gates:
                 for i in range(gate.num_summands_decomposed):
-                    symbs_t = gate.matrix22_t[gate.qubits_t[0]][i].flat()
-                    nums_t = gate.matrix22_t_numeric[gate.qubits_t[0]][i].flatten()
-                    for s, n in zip(symbs_t, nums_t):
-                        if n == 0:
-                            self.unitary = self.unitary.subs(s, n)
+                    for qt in gate.qubits_t:
+                        symbs_t = gate.matrix22_t[qt][i].flat()
+                        nums_t = gate.matrix22_t_numeric[qt][i].flatten()
+                        for s, n in zip(symbs_t, nums_t):
+                            if (n == 0 and zeros) or (n == 1 and ones):
+                                self.unitary = self.unitary.subs(s, n)
                     
                     if gate.qubits_c is not None:
-                        symbs_c = gate.matrix22_c[gate.qubits_c[0]][i].flat() 
-                        nums_c = gate.matrix22_c_numeric[gate.qubits_c[0]][i].flatten()
-                        for s, n in zip(symbs_c, nums_c):
-                            if n == 0:
-                                self.unitary = self.unitary.subs(s, n)
+                        for qc in gate.qubits_c:
+                            symbs_c = gate.matrix22_c[qc][i].flat()
+                            nums_c = gate.matrix22_c_numeric[gate.qubits_c[0]][i].flatten()
+                            for s, n in zip(symbs_c, nums_c):
+                                if (n == 0 and zeros) or (n == 1 and ones):
+                                    self.unitary = self.unitary.subs(s, n)
     
     @staticmethod
     def _filter_gates_to_replace_with_alternatives(gate_collection, gate_identifications):
@@ -154,7 +159,8 @@ class QuantumCircuit():
         else:
             generator_all_identifiers = ((gate_identifications['steps'][i], gate_identifications['names'][i], gate_identifications['qubits_t'][i]) for i in range(len(gate_identifications['steps'])))
             list_gates_to_replace = [it[0] for it in itertools.product(generator_all_gates, generator_all_identifiers) if (it[0].step == it[1][0] and it[0].name == it[1][1] and it[1][2] in it[0].qubits_t)]
-        return [gate for gate in list_gates_to_replace if hasattr(gate, 'matrix_alt')]
+        #return [gate for gate in list_gates_to_replace if hasattr(gate, 'matrix_alt')]
+        return [gate for gate in list_gates_to_replace if gate.is_parametric]
 
     def subs_symbolic_alternatives_in_symbolic_unitary(self, gate_identifications: Mapping[str, Iterable]|None=None):
         '''Substitute entries in the symbolic unitary that have alternative representations. This is typically the case for parametric gates.  
@@ -178,25 +184,24 @@ class QuantumCircuit():
                 print(f'Warning: Number of gates found to replace -{len_list_gates_to_replace}- does not match number of identifications provided -{num_to_replace}-')
         else:
             list_gates_to_replace = self._filter_gates_to_replace_with_alternatives(self.gate_collection, gate_identifications)
-        self.unitary = self.unitary.subs({v[0]: v[1] for gate in list_gates_to_replace for v in zip(gate.matrix.flat(), gate.matrix_alt.flat())})
-
-        #for i in range(num_to_replace):
-        #    step = gate_identifications['steps'][i]
-        #    name = gate_identifications['names'][i]
-        #    qubit_t = gate_identifications['qubits_t'][i]
-        #    
-        #    for gate_type, gates in self.gate_collection.collections.items():
-        #        for gate in gates:
-        #            if gate.step != step or gate.name != name or qubit_t not in gate.qubits_t:
-        #                raise ValueError('Gate not found in the circuit to replace with alternative representation:', 'step', step, 'name', name, 'qubit_t', qubit_t)
-        #                
-        #            if hasattr(gate, 'matrix_alt'):
-        #                self.unitary = self.unitary.subs(zip(gate.matrix.flat(), gate.matrix_alt.flat()))
-        #            else:
-        #                raise ValueError('Gate does not have an alternative representation:', 'step', step, 'name', name, 'qubit_t', qubit_t)
+        #self.unitary = self.unitary.subs({v[0]: v[1] for gate in list_gates_to_replace for v in zip(gate.matrix.flat(), gate.matrix_alt.flat())})
+        dict_for_subs = {}
+        for gate in list_gates_to_replace:
+            if isinstance(gate, QuantumGateMultiQubit):
+                for qt, mats in gate.gates_t.items():
+                    for i,subgatestring in enumerate(mats):
+                        if gate.matrix22_t_alt[qt][i] is not None:
+                            gate_atomics = [v for gm22 in gate.matrix22_t[qt] for v in gm22 if subgatestring+'_qt'+str(qt) in v.name] # should be 4 elems which end in _p11, _p12, _p21, _p22
+                            _di_tmp = {s: n for s, n in zip(gate_atomics, gate.matrix22_t_alt[qt][i].flat())}
+                            _l = list(gate.atomics.values())
+                            dict_for_subs.update(_di_tmp)
+            else:
+                dict_for_subs.update({s: n for s, n in zip(gate.matrix.flat(), gate.matrix_alt.flat())})
+        
+        self.unitary = self.unitary.subs(dict_for_subs)
 
     def create_numeric_unitary_from_symbolic(self):
-        # subs_symbolic_zeros_in_symbolic_unitary based on this function, so if making changes to either you might want to adapt the other as well 
+        # subs_symbolic_zerosones_in_symbolic_unitary based on this function, so if making changes to either you might want to adapt the other as well 
         self.unitary_numeric = self.unitary.copy()
         for gate_type, gates in self.gate_collection.collections.items():
             for gate in gates:

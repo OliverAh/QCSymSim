@@ -16,7 +16,7 @@ OPENQASM3_TO_QSYMPY = {
     'rx': None,
     'ry': None,
     'rz': None,
-    'cx': CX_Gate_new,
+    'cx': CX_Gate,
     'cy': None,
     'cz': None,
     'cp': None,
@@ -25,7 +25,7 @@ OPENQASM3_TO_QSYMPY = {
     'crz': None,
     'ch': None,
     'swap': None,
-    'ccx': CCX_Gate_new,
+    'ccx': CCX_Gate,
     'cswap': None,
-    'cu': None
+    'cu': CU_Gate
     }
