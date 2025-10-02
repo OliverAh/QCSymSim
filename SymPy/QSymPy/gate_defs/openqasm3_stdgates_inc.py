@@ -424,5 +424,5 @@ class SWAP_Gate(QuantumGateMultiQubit):
         self.matrix22_t_numeric = {key: [1/np.sqrt(2)*m for m in l] for key,l in self.matrix22_t_numeric.items()}
 
 class CSWAP_Gate(QuantumGateMultiQubit):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         raise NotImplementedError('CSWAP gate is not implemented yet.')

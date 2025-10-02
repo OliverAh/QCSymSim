@@ -110,4 +110,16 @@ def test_cy_gate_initialization():
 
 def test_swap_gate_initialization():
     gate = qp.SWAP_Gate(qubits_t=[2, 3], step=45)
-    assert False
+    assert gate.name == 'SWAP'
+    assert gate.shape == (4, 4)
+    assert gate.qubits_t == [2, 3]
+    assert gate.qubits_c in ([], None)
+    assert gate.matrix22_t[2][3] is not None
+    assert len(gate.matrix22_t) == 2
+    assert np.allclose(gate.matrix22_t_numeric[2][3], 1/np.sqrt(2)*np.array([[1, 0], [0, -1]]))
+    assert np.allclose(gate.matrix22_t_numeric[3][2], 1/np.sqrt(2)*np.array([[0, -1j], [1j, 0]]))
+    assert gate.matrix_numeric.tolist() == [[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
+
+def test_cswap_gate_initialization():
+    with pytest.raises(NotImplementedError, match="CSWAP gate is not implemented yet."):
+        gate = qp.CSWAP_Gate(qubits_t=[2, 3], qubits_c=[1], step=55)

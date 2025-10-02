@@ -120,6 +120,11 @@ class QuantumCircuit():
                 
                 if step not in self.steps:
                     self.steps[step] = []
+                for gc in self.steps[step]:
+                    if any(q in gc.qubits_t  or q in gc.qubits_c for q in qubits_t if gc.qubits_c is not None):
+                        raise ValueError(f'Conflict: Target qubit(s) {set(gc.qubits_t).intersection(set(qubits_t))} already have a gate applied at step {step}.')
+                    elif qubits_c is not None and gc.qubits_c is not None and any(q in gc.qubits_t or q in gc.qubits_c for q in qubits_c):
+                        raise ValueError(f'Conflict: Control qubit(s) {set(gc.qubits_c).intersection(set(qubits_c))} already have a gate applied at step {step}.')
                 self.steps[step].append(gate)
                 #self.steps.sort()
                 #print(self.steps)
