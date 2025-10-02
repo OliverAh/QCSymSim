@@ -13,7 +13,7 @@ import functools
 from . import gate_bases
 from .gate_bases import *
 from .gate_defs import *
-from .src_qubit_qreg import QBit, CBit, QReg, CReg
+from .bits_regs import QBit, CBit, QReg, CReg, MapBitID
 
 #KNOWN_GATES_CLASSES = {} # will be set at the end of the file (end of the import of QSymPy), when all gate classes are defined. Uses QuantumGate.__subclasses__()
 
@@ -31,6 +31,8 @@ class GateCollection(QuantumGate):
 
 class QuantumCircuit():
     def __init__(self, num_qubits: int=1, num_clbits: int=1):
+        
+        self.context = MapBitID()
         self.qubits = list(reversed(list(range(num_qubits))))
         self.clbits = list(reversed(list(range(num_clbits))))
         self.gate_collection = GateCollection()
@@ -39,6 +41,29 @@ class QuantumCircuit():
         self.unitary = None
         self.allowed_gates = self.gate_collection.known_gates
 
+    def add_qubit(self):
+        q = QBit(context=self.context)
+        return q
+    
+    def add_cbit(self):
+        c = CBit(context=self.context)
+        return c
+    
+    def add_qreg(self, name:str='', size:int=99):
+        if self.context.has_qreg(name):
+            raise ValueError('Quantum register with name already exists:', name)
+        qreg = QReg(context=self.context, name=name, size=size)
+        if size > len(self.qubits):
+            self.qubits = list(reversed(list(range(size))))
+        return qreg
+
+    def add_creg(self, name:str='', size:int=99):
+        if self.context.has_creg(name):
+            raise ValueError('Classical register with name already exists:', name)
+        creg = CReg(context=self.context, name=name, size=size)
+        if size > len(self.clbits):
+            self.clbits = list(reversed(list(range(size))))
+        return creg
 
     def add_gate(self, name:None|str='I', qubits_t: None|list[int]=None, qubits_c: None|list[int]=None, step: None|int=0, gate: QuantumGate|None=None, parameters: dict|None=None):
         if gate is not None:
@@ -303,7 +328,7 @@ def _map_qasmgatename_to_qcgatename(qasm_gate:str=None):
     
 def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program, qc: QuantumCircuit, timestep:int):
     gate_name_mapping_qasm_qc = {'x': 'X', 'y': 'Y', 'z': 'Z', 'h': 'H', 'cx': 'CX'}
-
+    
     for statement in qpf.statements:
         if isinstance(statement, openqasm3.ast.Include):
             print('Included filenames:', statement.filename)
@@ -314,6 +339,10 @@ def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program, qc: QuantumCircuit,
                 raise ValueError('Unknown type', 'statement.type:', statement.type)
             cbit_name = statement.identifier.name
             cbit_length = statement.type.size.value
+            if qc.context.has_creg(cbit_name):
+                raise ValueError('Classical register with name already exists:', cbit_name)
+            
+            
             if cbit_length > len(qc.clbits):
                 qc.clbits = list(reversed(list(range(cbit_length))))
             #print('Classical bit name:', cbit_name)
@@ -374,13 +403,19 @@ def openqasm3_to_qc(filepath: pathlib.Path, timestep:int|None=None, qc: QuantumC
         return qbit_mapping[q_qasm]
     def _qc_cbit(c_qasm, mapping=cbit_mapping):
         return cbit_mapping[c_qasm]
-    
-    if qc is None:
+
+
+
+    if timestep is None and qc is None:
+        timestep = 0
         qc = QuantumCircuit()
-    if timestep is None:
-        timestep: int = 0
-    else:
+    elif timestep is not None and qc is None:
+        qc = QuantumCircuit()
+        qc.steps[timestep] = []
+    elif timestep is None and qc is not None:
         timestep = max(tuple(qc.steps.keys())) + 1
+        qc.add_barrier(step = timestep-1)
+    elif timestep is not None and qc is not None:
         qc.add_barrier(step = timestep-1)
     
     with open(filepath, 'r') as f:
