@@ -14,7 +14,7 @@ def test_identity_gate_initialization():
     assert isinstance(gate, qp.QuantumGate)
     assert not isinstance(gate, qp.QuantumGateParameterized)
     assert not isinstance(gate, qp.QuantumGateMultiQubit)
-    assert not hasattr(gate, 'parameters')
+    assert gate.parameters is None
     assert not hasattr(gate, 'matrix_alt')
     assert not hasattr(gate, 'matrix22_t_alt')
     assert gate.name == 'I'

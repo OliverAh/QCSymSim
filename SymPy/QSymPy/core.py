@@ -8,15 +8,13 @@ import openqasm3
 import copy
 from typing import Literal, Mapping, Iterable
 import functools
+import tqdm
 
 #from . import gate_defs
 from . import gate_bases
 from .gate_bases import *
 from .gate_defs import *
 from .bits_regs import QBit, CBit, QReg, CReg, MapBitID
-
-#KNOWN_GATES_CLASSES = {} # will be set at the end of the file (end of the import of QSymPy), when all gate classes are defined. Uses QuantumGate.__subclasses__()
-
 
 
 class GateCollection(QuantumGate):
@@ -29,8 +27,16 @@ class GateCollection(QuantumGate):
         self.known_gates = gate_bases.get_known_gates_classes()
         self.collections = {id: [] for id, val in self.known_gates.items() if val.is_should_be_listed_in_gate_collection}
 
+    def __str__(self):
+        s = 'GateCollection:\n'
+        for k,v in self.collections.items():
+            s += f'  {k}: {len(v)} gates\n'
+        return s
+
+
+
 class QuantumCircuit():
-    def __init__(self, num_qubits: int=1, num_clbits: int=1):
+    def __init__(self, num_qubits: int=0, num_clbits: int=0):
         
         self.context = MapBitID()
         self.qubits = list(reversed(list(range(num_qubits))))
@@ -43,26 +49,26 @@ class QuantumCircuit():
 
     def add_qubit(self):
         q = QBit(context=self.context)
+        self.qubits = list(reversed(list(range(len(self.qubits)+1))))
         return q
     
     def add_cbit(self):
         c = CBit(context=self.context)
+        self.clbits = list(reversed(list(range(len(self.clbits)+1))))
         return c
     
     def add_qreg(self, name:str='', size:int=99):
         if self.context.has_qreg(name):
             raise ValueError('Quantum register with name already exists:', name)
         qreg = QReg(context=self.context, name=name, size=size)
-        if size > len(self.qubits):
-            self.qubits = list(reversed(list(range(size))))
+        self.qubits = list(reversed(list(range(len(self.qubits)+size))))
         return qreg
 
     def add_creg(self, name:str='', size:int=99):
         if self.context.has_creg(name):
             raise ValueError('Classical register with name already exists:', name)
         creg = CReg(context=self.context, name=name, size=size)
-        if size > len(self.clbits):
-            self.clbits = list(reversed(list(range(size))))
+        self.clbits = list(reversed(list(range(len(self.clbits)+size))))
         return creg
 
     def add_gate(self, name:None|str='I', qubits_t: None|list[int]=None, qubits_c: None|list[int]=None, step: None|int=0, gate: QuantumGate|None=None, parameters: dict|None=None):
@@ -160,10 +166,10 @@ class QuantumCircuit():
         bar = Barrier(step=step)
         self.barrier_collection.append(bar)
     
-    def assemble_symbolic_unitary(self):
+    def assemble_symbolic_unitary(self, use_alternative_repr:bool=False, replace_symbolic_zeros_and_ones:bool=True):
         '''Assemble the unitary matrix of the quantum circuit.'''
         self.unitary = sp.eye(2**len(self.qubits))
-        for step in self.steps.keys():# step is step number of timesteps
+        for step in tqdm.tqdm(self.steps.keys()):# step is step number of timesteps
             unitary_step = sp.zeros(2**len(self.qubits))
             gates_step = self.steps[step]
             #print(gates_step)
@@ -171,22 +177,30 @@ class QuantumCircuit():
             for i in range(num_sum_max):
                 gates = [None]*len(self.qubits)
                 for gate in gates_step:
-                    if gate.num_summands_decomposed >= i:
+                    if gate.num_summands_decomposed > i:
                         #q_t = gate.qubits_t[0]
                         #gates[q_t] = gate.matrix22_t[q_t][i]
                         for q_t in gate.qubits_t:
                             gates[q_t] = gate.matrix22_t[q_t][i]
+                            if replace_symbolic_zeros_and_ones:
+                                gates[q_t] = gates[q_t].subs({s: n for s,n in zip(gate.matrix22_t[q_t][i].flat(), 
+                                                                                  gate.matrix22_t_numeric[q_t][i].flatten()) if n == 0 or n == 1})
                         #print(gates[q_t])
                         if gate.qubits_c is not None:
                             #q_c = gate.qubits_c[0]
                             #gates[q_c] = gate.matrix22_c[q_c][i]
                             for q_c in gate.qubits_c:
                                 gates[q_c] = gate.matrix22_c[q_c][i]
+                                if replace_symbolic_zeros_and_ones:
+                                    gates[q_c] = gates[q_c].subs({s: n for s,n in zip(gate.matrix22_c[q_c][i].flat(), 
+                                                                                      gate.matrix22_c_numeric[q_c][i].flatten()) if n == 0 or n == 1})
                 for j in range(len(gates)):
                     if gates[j] is None:
                         #gates[j] = Identity_Gate(qubits_t=[j], qubits_c=None, step=step).matrix22_t[j][0]
                         gates[j] = sp.eye(2)
                 gates = list(reversed(gates)) # reverse the list to match the order of the qubits (little endian) for the tensor product
+                assert all(isinstance(g, sp.MatrixBase) for g in gates)
+                assert all(all(isinstance(e, sp.Expr) for e in g) for g in gates)
                 _tmp_unitary = gates[0]
                 for j in range(1, len(gates)):
                     #print(j, gates[j])
@@ -270,10 +284,14 @@ class QuantumCircuit():
         self.unitary_numeric = self.unitary.copy()
         for gate_type, gates in self.gate_collection.collections.items():
             for gate in gates:
+                print(gate)
                 for i in range(gate.num_summands_decomposed):
                     symbs_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t[q_t][i].flat()]
                     nums_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t_numeric[q_t][i].flatten()]
+                    print(symbs_t)
+                    print(nums_t)
                     for s, n in zip(symbs_t, nums_t):
+                        print(s, n)
                         self.unitary_numeric = self.unitary_numeric.subs(s, n)
                     
                     if gate.qubits_c is not None:
@@ -326,103 +344,203 @@ def _map_qasmgatename_to_qcgatename(qasm_gate:str=None):
     else:
         raise ValueError('Unknown qasm gate name:', qasm_gate)
     
-def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program, qc: QuantumCircuit, timestep:int):
-    gate_name_mapping_qasm_qc = {'x': 'X', 'y': 'Y', 'z': 'Z', 'h': 'H', 'cx': 'CX'}
-    
-    for statement in qpf.statements:
-        if isinstance(statement, openqasm3.ast.Include):
-            print('Included filenames:', statement.filename)
-        elif isinstance(statement, openqasm3.ast.ClassicalDeclaration):
-            if isinstance(statement.type, openqasm3.ast.BitType):
-                cbit_type = 'bit'
+def _parse_binary_expression_to_single_object(be:openqasm3.ast.BinaryExpression) -> object:
+    _op  = be.op
+    _lhs = be.lhs
+    _rhs = be.rhs
+
+    return_objs = []
+    for obj in (be.lhs, be.rhs):
+        if isinstance(obj, openqasm3.ast.BinaryExpression):
+            obj = _parse_binary_expression_to_single_object(obj)
+        elif isinstance(obj, openqasm3.ast.UnaryExpression):
+            obj = _parse_unary_expression_to_single_object(obj)
+        elif isinstance(obj, openqasm3.ast.Identifier):
+            if obj.name == 'pi':
+                obj = sp.pi
             else:
-                raise ValueError('Unknown type', 'statement.type:', statement.type)
-            cbit_name = statement.identifier.name
-            cbit_length = statement.type.size.value
-            if qc.context.has_creg(cbit_name):
-                raise ValueError('Classical register with name already exists:', cbit_name)
-            
-            
-            if cbit_length > len(qc.clbits):
-                qc.clbits = list(reversed(list(range(cbit_length))))
-            #print('Classical bit name:', cbit_name)
-            #print('Classical bit type:', cbit_type)
-            #print('Classical bit length:', cbit_length)
-        elif isinstance(statement, openqasm3.ast.QubitDeclaration):
-            qbit_name = statement.qubit.name
-            qbit_length = statement.size.value
-            if qbit_length > len(qc.qubits):
-                qc.qubits = list(reversed(list(range(qbit_length))))
-            #print('Quantum bit name:', qbit_name)
-            #print('Quantum bit length:', qbit_length)
-        elif isinstance(statement, openqasm3.ast.QuantumGate):
-            qgate_name = statement.name.name
-            qgate_qbit_names = [statement.qubits[i].name.name for i in range(len(statement.qubits))]
-            qgate_qbit_indices = [statement.qubits[i].indices[0][0].value for i in range(len(statement.qubits))] # why is there doubly nested list in indices?
-            #print('Quantum gate name:', qgate_name)
-            #print('Quantum gate qubits names:', qgate_qbit_names)
-            #print('Quantum gate qubits indices:', qgate_qbit_indices)
-            #qc_gate_name = _map_qasmgatename_to_qcgatename(qgate_name)
-            qc_gate_name = gate_name_mapping_qasm_qc[qgate_name]
-            if len (qgate_qbit_indices) == 1: # single qubit gate
-                qc.add_gate(name=qc_gate_name, qubits_t=qgate_qbit_indices, step=timestep)
-            elif len (qgate_qbit_indices) == 2: # single qubit gate
-                qc.add_gate(name=qc_gate_name, qubits_c=[qgate_qbit_indices[0]], qubits_t=[qgate_qbit_indices[1]], step=timestep)
-        elif isinstance(statement, openqasm3.ast.QuantumBarrier):
-            #print(statement)
-            qbarrier_name = 'barrier' # name is not stored in statement 
-            qbarrier_qbit_names = [statement.qubits[i].name.name for i in range(len(statement.qubits))]
-            qbarrier_qbit_indices = [statement.qubits[i].indices[0][0].value for i in range(len(statement.qubits))] # why is there doubly nested list in indices?
-            #print('Quantum gate name:', qbarrier_name)
-            #print('Quantum gate qubits names:', qbarrier_qbit_names)
-            #print('Quantum gate qubits indices:', qbarrier_qbit_indices)
-            qc.add_barrier(step=timestep)
-            timestep += 1
-        elif isinstance(statement, openqasm3.ast.QuantumMeasurementStatement):
-            #print(statement)
-            qmeasurement_name = 'measurement' # name is not stored in statement 
-            qmeasurement_qbit_name = statement.measure.qubit.name.name
-            qmeasurement_qbit_index = statement.measure.qubit.indices[0][0].value
-            qmeasurement_cbit_name = statement.target.name.name
-            qmeasurement_cbit_index = statement.target.indices[0][0].value
-            #print('Quantum measurement name:', qmeasurement_name)
-            #print('Quantum measurement qubit name:', qmeasurement_qbit_name)
-            #print('Quantum measurement qubit index:', qmeasurement_qbit_index)
-            #print('Quantum measurement cbit name:', qmeasurement_cbit_name)
-            #print('Quantum measurement cbit index:', qmeasurement_cbit_index)
+                raise ValueError('Unknown identifier:', obj)
+        elif isinstance(obj, openqasm3.ast.IntegerLiteral):
+            obj = int(obj.value)
+        else:
+            raise ValueError('Unknown object:', obj)
+        return_objs.append(obj)
+    _lhs, _rhs = return_objs
+    assert isinstance(_op, openqasm3.ast.BinaryOperator)
+    if _op.name == '/':
+        return _lhs/_rhs
+    elif _op.name == '*':
+        return _lhs*_rhs
+    elif _op.name == '+':
+        return _lhs+_rhs
+    elif _op.name == '-':
+        return _lhs-_rhs
+    elif _op.name == '**':
+        return _lhs**_rhs
+    else:
+        raise ValueError('Unknown binary operator:', _op)
+
+def _parse_unary_expression_to_single_object(ue:openqasm3.ast.UnaryExpression) -> object:
+    _op = ue.op
+    _expr = ue.expression
+
+    if isinstance(_expr, openqasm3.ast.BinaryExpression):
+        _expr = _parse_binary_expression_to_single_object(_expr)
+    elif isinstance(_expr, openqasm3.ast.UnaryExpression):
+        _expr = _parse_unary_expression_to_single_object(_expr)
+    elif isinstance(_expr, openqasm3.ast.Identifier):
+        if _expr.name == 'pi':
+            _expr = sp.pi
+        else:
+            raise ValueError('Unknown identifier:', _expr)
+    elif isinstance(_expr, openqasm3.ast.IntegerLiteral):
+        _expr = int(_expr.value)
+    elif isinstance(_expr, openqasm3.ast.FloatLiteral):
+        _expr = float(_expr.value)
+    else:
+        raise ValueError('Unknown object:', _expr)
     
+    assert isinstance(_op, openqasm3.ast.UnaryOperator)
+    if _op.name == '+':
+        return +_expr
+    elif _op.name == '-':
+        return -_expr
+    else:
+        raise ValueError('Unknown unary operator:', _op)
+
+def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program) -> QuantumCircuit:
+    qc = QuantumCircuit()
+    _gate_set_step = set()
+    for s in qpf.statements:
+        if isinstance(s, openqasm3.ast.Include):
+            print('Included filenames:', s.filename)
+            if s.filename != 'stdgates.inc':
+                raise ValueError('Only stdgates.inc is supported as include file, not:', s.filename)
+        elif isinstance(s, openqasm3.ast.ClassicalDeclaration):
+            if isinstance(s.type, openqasm3.ast.BitType):
+                if not qc.context.has_creg(s.identifier.name):
+                    qc.add_creg(name=s.identifier.name, size=s.type.size.value)
+                else:
+                    raise ValueError('Classical register with name already exists:', s.identifier.name)
+            else:
+                raise ValueError('Unknown type', 's.type:', s.type)
+        elif isinstance(s, openqasm3.ast.QubitDeclaration):
+            # in contrast to ClassicalDeclaration, QubitDeclaration does not have a type field,
+            # the "identifier" is always qubit
+            print(s.qubit.name)
+            if not qc.context.has_qreg(s.qubit.name):
+                qc.add_qreg(name=s.qubit.name, size=s.size.value)
+        elif isinstance(s, openqasm3.ast.QuantumGate):
+            # s.name is of type openqasm3.ast.Identifier, s.name.name is the actual name string
+            _gate_name = s.name.name
+            _gate_modifiers = s.modifiers
+            assert _gate_modifiers==[], f'gate modiefier: {_gate_modifiers} ... Gate modifiers not yet implemented, you should implement separate gate instead.'
+            _gate_arguments = s.arguments
+            if _gate_arguments == []:
+                pass
+            elif isinstance(_gate_arguments, list):
+                _list_gate_arguments = []
+                for arg in _gate_arguments:
+                    if isinstance(arg, openqasm3.ast.BinaryExpression):
+                        _list_gate_arguments.append(_parse_binary_expression_to_single_object(arg))
+                    elif isinstance(arg, openqasm3.ast.UnaryExpression):
+                        _list_gate_arguments.append(_parse_unary_expression_to_single_object(arg))
+                    elif isinstance(arg, openqasm3.ast.Identifier):
+                        if arg.name == 'pi':
+                            _list_gate_arguments.append(sp.pi)
+                        else:
+                            raise ValueError('Unknown identifier:', arg)
+                    elif isinstance(arg, openqasm3.ast.IntegerLiteral):
+                        _list_gate_arguments.append(int(arg.value))
+                    elif isinstance(arg, openqasm3.ast.FloatLiteral):
+                        _list_gate_arguments.append(float(arg.value))
+                    else:
+                        raise ValueError('Unknown gate argument:', arg)
+                    print('  Gate arguments:', _list_gate_arguments)
+            else:
+                raise ValueError('Unknown gate arguments:', _gate_arguments)
+            
+            _gate_qubits = s.qubits
+            assert isinstance(_gate_qubits, list), f'expected list for gate qubits: {_gate_qubits}'
+            _gate_qubits_glob_ids = []
+            for _q in _gate_qubits:
+                # indexed identifier means that object requires indexing
+                assert isinstance(_q, openqasm3.ast.IndexedIdentifier)
+                assert isinstance(_q.name, openqasm3.ast.Identifier)
+                if not qc.context.has_qreg(_q.name.name):
+                    raise ValueError('Qubit register with name does not exist:', _q.name.name, '... tried to apply gate', s)
+                else:
+                    assert isinstance(_q.indices, list)
+                    assert len(_q.indices)==1, f'broadcasting of gates on registers is not implemented. {s}'
+                    assert isinstance(_q.indices[0], list)
+                    assert len(_q.indices[0])==1, f'broadcasting of gates on registers is not implemented. {s}'
+                    assert isinstance(_q.indices[0][0], openqasm3.ast.IntegerLiteral)
+                    _q_name = _q.name.name
+                    _q_index = _q.indices[0][0].value
+                    _gate_qubits_glob_ids.append(qc.context.map_bit_id['q']['l2g'][_q_name][_q_index])
+            _gate_target = OPENQASM3_TO_QSYMPY[_gate_name]
+            _n_q_t = _gate_target.num_qubits_t
+            _n_q_c = _gate_target.num_qubits_c
+            
+            _step = list(qc.steps.keys())[-1] if len(qc.steps)>0 else 0
+            print('Current step for gates:', _step)
+            if set() == _gate_set_step.intersection(_gate_qubits_glob_ids):
+                _gate_set_step.update(_gate_qubits_glob_ids)
+            else:
+                _step += 1
+                _gate_set_step = set(_gate_qubits_glob_ids)
+            print('Adding gate at step:', _step)
+            print('  Gate qubits global IDs:', _gate_qubits_glob_ids)
+
+            _parameters = {k:v for (k,v) in zip(_gate_target.parameters, _list_gate_arguments)} if _gate_arguments != [] else None
+            qc.add_gate(name=_gate_target.name_gate_collection, qubits_t=_gate_qubits_glob_ids[:_n_q_t], qubits_c=_gate_qubits_glob_ids[_n_q_t:_n_q_t+_n_q_c], step=_step,
+                         parameters=_parameters)
+            print('Quantum gate name:', _gate_name)
+            print('Quantum gate arguments:', _gate_arguments)
+            print('Quantum gate qubits names + ids:', [(_q.name.name, _q.indices[0][0].value) for _q in _gate_qubits])
+            print('QuantumGate to add:', OPENQASM3_TO_QSYMPY[_gate_name])
+        elif isinstance(s, openqasm3.ast.QuantumBarrier):
+            _step = list(qc.steps.keys())[-1]+1 if len(qc.steps)>0 else 1
+            qc.add_barrier(step=_step)
+            print('Barrier added at step:', _step)
+        elif isinstance(s, openqasm3.ast.QuantumMeasurementStatement):
+            assert isinstance(s.measure, openqasm3.ast.QuantumMeasurement)
+            assert isinstance(s.measure.qubit, openqasm3.ast.IndexedIdentifier)
+            assert isinstance(s.measure.qubit.name, openqasm3.ast.Identifier)
+            assert isinstance(s.measure.qubit.indices, list)
+            assert len(s.measure.qubit.indices)==1
+            assert isinstance(s.measure.qubit.indices[0], list)
+            assert len(s.measure.qubit.indices[0])==1
+            _qubit_name = s.measure.qubit.name.name
+            _qubit_index = s.measure.qubit.indices[0][0].value
+            assert isinstance(s.target, openqasm3.ast.IndexedIdentifier)
+            assert isinstance(s.target.name, openqasm3.ast.Identifier)
+            assert isinstance(s.target.indices, list)
+            assert len(s.target.indices)==1
+            assert isinstance(s.target.indices[0], list)
+            assert len(s.target.indices[0])==1
+            _cbit_name = s.target.name.name
+            _cbit_index = s.target.indices[0][0].value
+            #print('  Measured qubit name:', _qubit_name)
+            #print('  Measured qubit index:', _qubit_index)
+            #print('  Target classical bit name:', _cbit_name)
+            #print('  Target classical bit index:', _cbit_index)
+            print('WARNING:  Measurement not yet implemented.')
+            
+        else:
+            raise ValueError('Unknown statement:', s)
     return qc
 
-def openqasm3_to_qc(filepath: pathlib.Path, timestep:int|None=None, qc: QuantumCircuit|None=None, qbit_mapping:dict[int:int]|None=None, cbit_mapping:dict[int:int]|None=None):
-    '''Function to read an OpenQASM 3 file and convert it to a QuantumCircuit object. If a QuantumCircuit object is provided, the circuit from the
-    OpenQASM 3 file is appended to it.
-    In that case a qubit and cbit mapping is required as dicts: {*bitnumber qc: *bitnumber qasm}.
-    If a timestep is provided, it will overwrite the automatically determined value, which is 0 if there is no qc provided, or last timestep of the qc +1.
+def openqasm3_to_qc(filepath: pathlib.Path) -> QuantumCircuit:
+    '''Function to read an OpenQASM 3 file and convert it to a QuantumCircuit object.
     '''
-    def _qc_qbit(q_qasm, mapping=qbit_mapping):
-        return qbit_mapping[q_qasm]
-    def _qc_cbit(c_qasm, mapping=cbit_mapping):
-        return cbit_mapping[c_qasm]
 
-
-
-    if timestep is None and qc is None:
-        timestep = 0
-        qc = QuantumCircuit()
-    elif timestep is not None and qc is None:
-        qc = QuantumCircuit()
-        qc.steps[timestep] = []
-    elif timestep is None and qc is not None:
-        timestep = max(tuple(qc.steps.keys())) + 1
-        qc.add_barrier(step = timestep-1)
-    elif timestep is not None and qc is not None:
-        qc.add_barrier(step = timestep-1)
     
     with open(filepath, 'r') as f:
         qpf = f.read()
     
     qpf = openqasm3.parse(qpf)
     
-    qc = _iterate_over_qasm_statements(qpf, qc, timestep)
+    qc = _iterate_over_qasm_statements(qpf)
     return qc
 

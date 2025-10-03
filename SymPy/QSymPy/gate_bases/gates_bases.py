@@ -28,7 +28,10 @@ class QuantumGate:
     |0 0 1> = (1,0) kron (1,0) kron (0,1) = (0,1,0,0,0,0,0,0).'''
     # We need information about the qubit and step here, because otherwise the atomic symbols could not be distinguished from those of other gates
     is_should_be_listed_in_gate_collection = False
-    
+    name_gate_collection = ''
+    num_qubits_t = 0
+    num_qubits_c = 0
+    parameters=None
     def __init__(self, name: str='', name_short: str='', shape:tuple[int,int]=[2,2], qubits_t: list[int]=[0], qubits_c: None|list[int]=None, step: int=0, num_summands_decomposed: int=1,
                  parameters: None=None):
         assert parameters is None, 'Parameters are not supported in the QuantumGate class. Use QuantumGateParameterized instead.'
@@ -61,6 +64,14 @@ class QuantumGate:
             yield key, getattr(self, key)
     def items(self):
         return self.__iter__()
+
+    def __str__(self):
+        s = ''
+        s += f'({self.name}, s: {self.step}, qt: {self.qubits_t}, q_c: {self.qubits_c}, p: {self.parameters})'
+        return s
+    def __repr__(self):
+        return self.__str__()
+
 
 class QuantumGateParameterized(QuantumGate):
     '''Base class for parameterized quantum gates. It holds information of the operation that is applied to the qubit(s).

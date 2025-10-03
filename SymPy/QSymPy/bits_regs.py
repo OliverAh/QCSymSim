@@ -37,6 +37,13 @@ class MapBitID():
         return len(self.map_bit_id['q']['g2l'])
     def num_cbits(self):
         return len(self.map_bit_id['c']['g2l'])
+    
+    def __str__(self):
+        s = ''
+        for t,x in self.map_bit_id.items():
+            for k,v in x.items():
+                s += f'{t} {k}: {v}\n'
+        return s
 
 class Bit():
     '''Base class for qubits and classical bits.'''

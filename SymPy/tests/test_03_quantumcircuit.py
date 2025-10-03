@@ -120,7 +120,7 @@ class TestAssemble_symbolic_unitary_2qubits:
                 qc.add_gate(name=g0, qubits_t=[0], step=0)
                 qc.add_gate(name=g1, qubits_t=[1], step=0)
 
-                qc.assemble_symbolic_unitary()
+                qc.assemble_symbolic_unitary(replace_symbolic_zeros_and_ones=False)
                 assert qc.unitary.shape == (4, 4)
                 #print(f"Unitary for {g0} and {g1}:")
                 if g0 != g1:
