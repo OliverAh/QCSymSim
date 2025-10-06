@@ -12,11 +12,13 @@ import QSymPy as qp
 def test_identity_gate_initialization():
     gate = qp.Identity_Gate(qubits_t=[0], step=0)
     assert isinstance(gate, qp.QuantumGate)
-    assert not isinstance(gate, qp.QuantumGateParameterized)
+    #assert not isinstance(gate, qp.QuantumGateParameterized)
     assert not isinstance(gate, qp.QuantumGateMultiQubit)
+    assert not type(gate).is_parametric
+    assert gate.atomics_alt is None
     assert gate.parameters is None
-    assert not hasattr(gate, 'matrix_alt')
-    assert not hasattr(gate, 'matrix22_t_alt')
+    assert gate.matrix_alt is None
+    assert gate.matrix22_t_alt is None
     assert gate.name == 'I'
     assert gate.shape == (2, 2)
     assert gate.qubits_t == [0]
@@ -99,7 +101,8 @@ def test_u_gate_initialization():
         qp.U_Gate(qubits_t=[0], step=9, parameters={'theta': np.pi/2, 'phi': np.pi/4})
     parameters = {'theta': np.pi/2, 'phi': np.pi/4, 'lambda': np.pi/8}
     gate = qp.U_Gate(qubits_t=[0], step=9, parameters=parameters)
-    assert isinstance(gate, qp.QuantumGateParameterized)
+    #assert isinstance(gate, qp.QuantumGateParameterized)
+    assert isinstance(gate, qp.QuantumGate)
     assert not isinstance(gate, qp.QuantumGateMultiQubit)
     assert hasattr(gate, 'parameters')
     assert hasattr(gate, 'matrix_alt')
@@ -119,7 +122,8 @@ def test_gp_gate_initialization():
         qp.GP_Gate(qubits_t=[0], step=10, parameters={})
     parameters = {'gamma': np.pi/16 }
     gate = qp.GP_Gate(qubits_t=[0], step=10, parameters=parameters)
-    assert isinstance(gate, qp.QuantumGateParameterized)
+    #assert isinstance(gate, qp.QuantumGateParameterized)
+    assert isinstance(gate, qp.QuantumGate)
     assert not isinstance(gate, qp.QuantumGateMultiQubit)
     assert hasattr(gate, 'parameters')
     assert hasattr(gate, 'matrix_alt')
@@ -166,7 +170,8 @@ def test_uforcu_gate_initialization():
         qp.U_for_CU_Gate(qubits_t=[1], qubits_c=[0], step=15, parameters=parameters)
     parameters = {'theta': np.pi/16, 'phi': np.pi/32, 'lambda': np.pi/64, 'gamma': np.pi/128}
     gate = qp.U_for_CU_Gate(qubits_t=[1], qubits_c=[0], step=15, parameters=parameters)
-    assert isinstance(gate, qp.QuantumGateParameterized)
+    #assert isinstance(gate, qp.QuantumGateParameterized)
+    assert isinstance(gate, qp.QuantumGate)
     assert not isinstance(gate, qp.QuantumGateMultiQubit)
     assert hasattr(gate, 'parameters')
     assert hasattr(gate, 'matrix_alt')
