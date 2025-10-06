@@ -1,5 +1,7 @@
 import pathlib
 import sympy as sp
+import sympy.core
+import sympy.core.numbers
 import itertools
 import numpy as np
 #import sympy.physics as sp_phy
@@ -181,18 +183,24 @@ class QuantumCircuit():
                         #q_t = gate.qubits_t[0]
                         #gates[q_t] = gate.matrix22_t[q_t][i]
                         for q_t in gate.qubits_t:
-                            gates[q_t] = gate.matrix22_t[q_t][i]
-                            if replace_symbolic_zeros_and_ones:
-                                gates[q_t] = gates[q_t].subs({s: n for s,n in zip(gate.matrix22_t[q_t][i].flat(), 
+                            if use_alternative_repr and gate.is_parametric and hasattr(gate, 'matrix22_t_alt'):
+                                
+                                gates[q_t] = gate.matrix22_t_alt[q_t][i]
+                            else:
+                                gates[q_t] = gate.matrix22_t[q_t][i]
+                                if replace_symbolic_zeros_and_ones:
+                                    gates[q_t] = gates[q_t].xreplace({s: (sympy.core.numbers.Zero() if n == 0 else sympy.core.numbers.One()) for s,n in zip(gate.matrix22_t[q_t][i].flat(), 
                                                                                   gate.matrix22_t_numeric[q_t][i].flatten()) if n == 0 or n == 1})
                         #print(gates[q_t])
                         if gate.qubits_c is not None:
                             #q_c = gate.qubits_c[0]
                             #gates[q_c] = gate.matrix22_c[q_c][i]
                             for q_c in gate.qubits_c:
+                                if use_alternative_repr and hasattr(gate, 'matrix22_c_alt'):
+                                    raise ValueError('Alternative representation for control qubits not yet implemented.')
                                 gates[q_c] = gate.matrix22_c[q_c][i]
                                 if replace_symbolic_zeros_and_ones:
-                                    gates[q_c] = gates[q_c].subs({s: n for s,n in zip(gate.matrix22_c[q_c][i].flat(), 
+                                    gates[q_c] = gates[q_c].xreplace({s: (sympy.core.numbers.Zero() if n == 0 else sympy.core.numbers.One()) for s,n in zip(gate.matrix22_c[q_c][i].flat(), 
                                                                                       gate.matrix22_c_numeric[q_c][i].flatten()) if n == 0 or n == 1})
                 for j in range(len(gates)):
                     if gates[j] is None:
@@ -201,11 +209,12 @@ class QuantumCircuit():
                 gates = list(reversed(gates)) # reverse the list to match the order of the qubits (little endian) for the tensor product
                 assert all(isinstance(g, sp.MatrixBase) for g in gates)
                 assert all(all(isinstance(e, sp.Expr) for e in g) for g in gates)
-                _tmp_unitary = gates[0]
-                for j in range(1, len(gates)):
+                #_tmp_unitary = gates[0]
+                #for j in range(1, len(gates)):
                     #print(j, gates[j])
-                    _tmp_unitary = sp_phy_qant.TensorProduct(_tmp_unitary, gates[j])
+                #    _tmp_unitary = sp_phy_qant.TensorProduct(_tmp_unitary, gates[j])
                 #display(_tmp_unitary)
+                _tmp_unitary = sp_phy_qant.TensorProduct(*gates)
                 unitary_step += _tmp_unitary
             self.unitary = unitary_step @ self.unitary
     
@@ -234,7 +243,8 @@ class QuantumCircuit():
     def _filter_gates_to_replace_with_alternatives(gate_collection, gate_identifications):
         generator_all_gates = (gate for collection in gate_collection.collections.values() for gate in collection)
         if gate_identifications is None:
-            list_gates_to_replace = [gate for gate in generator_all_gates]
+            # list contains all gates in the circuit
+            list_gates_to_replace = [gate for gate in generator_all_gates if gate.is_parametric]
         else:
             generator_all_identifiers = ((gate_identifications['steps'][i], gate_identifications['names'][i], gate_identifications['qubits_t'][i]) for i in range(len(gate_identifications['steps'])))
             list_gates_to_replace = [it[0] for it in itertools.product(generator_all_gates, generator_all_identifiers) if (it[0].step == it[1][0] and it[0].name == it[1][1] and it[1][2] in it[0].qubits_t)]
@@ -243,13 +253,13 @@ class QuantumCircuit():
 
     def subs_symbolic_alternatives_in_symbolic_unitary(self, gate_identifications: Mapping[str, Iterable]|None=None):
         '''Substitute entries in the symbolic unitary that have alternative representations. This is typically the case for parametric gates.  
-        The mapping is optional, if not provided all alternatives will be substituted.  
+        Param "gate_identifications" is optional, if not provided all alternatives will be substituted.  
         If provided, the mapping must identify each gate for which the alternative representation should be used, by step, name, and target qubits.
         Multiple gates can be identified by providing lists/tuples of the same length for each key.  
         For now the keys of the mapping MUST be 'steps', 'names', and 'qubits_t. This might be changed in the future to allow more flexible identification.
-        Example: gate_identifications = {'step': (0, 1), 'name': (CX, U), 'qubits_t': (1, 1)}  
-        would substitute the alternatives for a CX gate at step 0 targeting qubit 1, and a U gate at step 1 targeting qubit 1.  
-        It is sufficient to provide only the target qubit (and only 1 target qubit in case of a multi-qubit gate) as a qubit can only have applied 1 gate per timestep.'''
+        Example: gate_identifications = {'step': (0, 1), 'name': (GP, U), 'qubits_t': (1, 1)}  
+        would substitute the alternatives for a GP gate at step 0 targeting qubit 1, and a U gate at step 1 targeting qubit 1.  
+        It is sufficient to provide only the target qubit (and only 1 target qubit in case of a multi-qubit gate) as a qubit can only have applied 1 gate per step.'''
         
         # this function based create_numeric_unitary_from_symbolic, so if making changes to either you might want to adapt the other as well 
 
@@ -272,16 +282,18 @@ class QuantumCircuit():
                         if gate.matrix22_t_alt[qt][i] is not None:
                             gate_atomics = [v for gm22 in gate.matrix22_t[qt] for v in gm22 if subgatestring+'_qt'+str(qt) in v.name] # should be 4 elems which end in _p11, _p12, _p21, _p22
                             _di_tmp = {s: n for s, n in zip(gate_atomics, gate.matrix22_t_alt[qt][i].flat())}
-                            _l = list(gate.atomics.values())
+                            assert all(k not in dict_for_subs for k in _di_tmp.keys()), 'Conflict in substitutions, some symbols appear multiple times.'
                             dict_for_subs.update(_di_tmp)
             else:
+                assert all(k not in dict_for_subs for k in _di_tmp.keys()), 'Conflict in substitutions, some symbols appear multiple times.'
                 dict_for_subs.update({s: n for s, n in zip(gate.matrix.flat(), gate.matrix_alt.flat())})
         
-        self.unitary = self.unitary.subs(dict_for_subs)
+        self.unitary = self.unitary.xreplace(dict_for_subs)
 
     def create_numeric_unitary_from_symbolic(self):
         # subs_symbolic_zerosones_in_symbolic_unitary based on this function, so if making changes to either you might want to adapt the other as well 
         self.unitary_numeric = self.unitary.copy()
+        dict_for_subs = {}
         for gate_type, gates in self.gate_collection.collections.items():
             for gate in gates:
                 print(gate)
@@ -290,15 +302,18 @@ class QuantumCircuit():
                     nums_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t_numeric[q_t][i].flatten()]
                     print(symbs_t)
                     print(nums_t)
-                    for s, n in zip(symbs_t, nums_t):
-                        print(s, n)
-                        self.unitary_numeric = self.unitary_numeric.subs(s, n)
+                    _di_tmp = {s: n for s, n in zip(symbs_t, nums_t)}
+                    assert all(k not in dict_for_subs for k in _di_tmp.keys()), 'Conflict in substitutions, some symbols appear multiple times.'
+                    dict_for_subs.update(_di_tmp)
                     
                     if gate.qubits_c is not None:
                         symbs_c = [e for q_c in gate.qubits_c for e in gate.matrix22_c[q_c][i].flat()]
                         nums_c = [e for q_c in gate.qubits_c for e in gate.matrix22_c_numeric[q_c][i].flatten()]
-                        for s, n in zip(symbs_c, nums_c):
-                            self.unitary_numeric = self.unitary_numeric.subs(s, n)
+                        _di_tmp = {s: n for s, n in zip(symbs_c, nums_c)}
+                        assert all(k not in dict_for_subs for k in _di_tmp.keys()), 'Conflict in substitutions, some symbols appear multiple times.'
+                        dict_for_subs.update(_di_tmp)
+        
+        self.unitary_numeric = self.unitary_numeric.xreplace(dict_for_subs)
     
 class QuantumState():
     def __init__(self, num_qubits: int=1, method: str='statevector'):

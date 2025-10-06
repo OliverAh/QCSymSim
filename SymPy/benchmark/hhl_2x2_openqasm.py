@@ -20,7 +20,7 @@ timestamps['finish_build_qc'] = time.time()
 print(timestamps['finish_build_qc'])
 print('Time to parse QASM3 file and create QuantumCircuit:', timestamps['finish_build_qc'] - timestamps['start'])
 
-qc.assemble_symbolic_unitary()
+qc.assemble_symbolic_unitary(use_alternative_repr=True, replace_symbolic_zeros_and_ones=True)
 
 timestamps['finish_assemble_unitary'] = time.time()
 print(timestamps['finish_assemble_unitary'])
@@ -41,7 +41,9 @@ timestamps['finished_apply_unitary'] = time.time()
 print(timestamps['finished_apply_unitary'])
 print('Time to apply unitary:', timestamps['finished_apply_unitary'] - timestamps['finished_build_state'])
 
-var_for_grad = qc.gate_collection.collections['CU'][0].matrix22_t[1][1][0,0]
+a = qc.gate_collection.collections['CU'][0].matrix22_t_alt[1][1][0,0]
+var_for_grad = a.args[0].args[0].args[1]
+print('Variable for gradient:', var_for_grad)
 
 grad = sp.diff(state2[32], var_for_grad)
 

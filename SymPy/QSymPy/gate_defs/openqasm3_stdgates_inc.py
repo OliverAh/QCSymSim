@@ -182,11 +182,11 @@ class U_Gate(QuantumGateParameterized):
         assert parameters is not None and all(key in parameters for key in ['theta', 'phi', 'lambda']), "U gate requires parameters: {'theta': val, 'phi': val, 'lambda': val}"
         super().__init__(name=name, name_short='U', shape=(2,2), qubits_t=qubits_t, qubits_c=qubits_c, step=step)
         self.parameters = {'theta': parameters['theta'], 'phi': parameters['phi'], 'lambda': parameters['lambda']} if parameters is not None else {'theta': None, 'phi': None, 'lambda': None}
-        self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4]) for key in self.parameters.keys()} # {'theta': 'theta_U_qt0_qc0_s0_p00', ...}
+        self.atomics_alt = {key: sp.symbols(key+'_' + self.atomics['00'].name[:-4], real=True, finite=True, extended_finite=False) for key in self.parameters.keys()} # {'theta': 'theta_U_qt0_qc0_s0_p00', ...}
         self.matrix_alt = sp.Matrix([[sp.cos(self.atomics_alt['theta']/2)                                     , -sp.exp(sp.I*self.atomics_alt['lambda'])*sp.sin(self.atomics_alt['theta']/2)],
                                      [sp.exp(sp.I*self.atomics_alt['phi'])*sp.sin(self.atomics_alt['theta']/2), sp.exp(sp.I*(self.atomics_alt['phi']+self.atomics_alt['lambda']))*sp.cos(self.atomics_alt['theta']/2)]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric 
 
@@ -207,7 +207,7 @@ class GP_Gate(QuantumGateParameterized):
         self.matrix_alt = sp.Matrix([[sp.exp(sp.I*self.atomics_alt['gamma']), 0],
                                      [0, sp.exp(sp.I*self.atomics_alt['gamma'])]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
 
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
@@ -228,7 +228,7 @@ class RX_Gate(QuantumGateParameterized):
         self.matrix_alt = sp.Matrix([[ sp.cos(self.atomics_alt['theta']/2)    , -sp.I*sp.sin(self.atomics_alt['theta']/2)],
                                      [-sp.I*sp.sin(self.atomics_alt['theta']/2), sp.cos(self.atomics_alt['theta']/2)]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric 
 
@@ -248,7 +248,7 @@ class RY_Gate(QuantumGateParameterized):
         self.matrix_alt = sp.Matrix([[sp.cos(self.atomics_alt['theta']/2), -sp.sin(self.atomics_alt['theta']/2)],
                                      [sp.sin(self.atomics_alt['theta']/2),  sp.cos(self.atomics_alt['theta']/2)]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
 
@@ -269,7 +269,7 @@ class RZ_Gate(QuantumGateParameterized):
         self.matrix_alt = sp.Matrix([[    sp.exp(-sp.I*self.atomics_alt['lambda']/2), 0],
                                      [0,  sp.exp( sp.I*self.atomics_alt['lambda']/2)]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
 
@@ -289,7 +289,7 @@ class P_Gate(QuantumGateParameterized):
         self.matrix_alt = sp.Matrix([[1, 0],
                                      [0, sp.exp(sp.I*self.atomics_alt['lambda'])]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
 
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
@@ -348,7 +348,7 @@ class U_for_CU_Gate(QuantumGateParameterized):
                         * sp.Matrix([[sp.cos(self.atomics_alt['theta']/2)                                     , -sp.exp(sp.I*self.atomics_alt['lambda'])*sp.sin(self.atomics_alt['theta']/2)],
                                      [sp.exp(sp.I*self.atomics_alt['phi'])*sp.sin(self.atomics_alt['theta']/2), sp.exp(sp.I*(self.atomics_alt['phi']+self.atomics_alt['lambda']))*sp.cos(self.atomics_alt['theta']/2)]])
         self.matrix22_t[qubits_t[0]][0] = self.matrix
-        self.matrix22_t_alt = [[self.matrix_alt]]
+        self.matrix22_t_alt = {qubits_t[0]: [self.matrix_alt]}
         self.matrix_numeric = np.array(self.matrix_alt.subs({self.atomics_alt[key]: val for key, val in self.parameters.items()})).astype(complex)
         self.matrix22_t_numeric[qubits_t[0]][0] = self.matrix_numeric
     
