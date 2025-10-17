@@ -93,6 +93,7 @@ class QuantumGate:
         self.atomics_alt = None
         self.matrix_alt = None
         self.matrix22_t_alt = None
+
     
     def __iter__(self):
         for key in self.__dict__:

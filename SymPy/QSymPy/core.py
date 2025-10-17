@@ -64,6 +64,10 @@ class QuantumCircuit():
             raise ValueError('Quantum register with name already exists:', name)
         qreg = QReg(context=self.context, name=name, size=size)
         self.qubits = list(reversed(list(range(len(self.qubits)+size))))
+        #self.qubits = list(range(len(self.qubits)+size-1, -1, -1))
+        #self.context.map_bit_id['q']['g2l'].reverse()
+        #for k in self.context.map_bit_id['q']['l2g'].keys():
+        #    self.context.map_bit_id['q']['l2g'][k].reverse()
         return qreg
 
     def add_creg(self, name:str='', size:int=99):
@@ -168,7 +172,7 @@ class QuantumCircuit():
         bar = Barrier(step=step)
         self.barrier_collection.append(bar)
     
-    def assemble_symbolic_unitary(self, use_alternative_repr:bool=False, replace_symbolic_zeros_and_ones:bool=True):
+    def assemble_symbolic_unitary(self, use_alternative_repr:bool=False, replace_symbolic_zeros_and_ones:bool=False):
         '''Assemble the unitary matrix of the quantum circuit.'''
         self.unitary = sp.eye(2**len(self.qubits))
         for step in tqdm.tqdm(self.steps.keys()):# step is step number of timesteps
@@ -178,6 +182,7 @@ class QuantumCircuit():
             num_sum_max = max([g.num_summands_decomposed for g in gates_step])
             for i in range(num_sum_max):
                 gates = [None]*len(self.qubits)
+                dict_replace_treat_numeric_only = {}
                 for gate in gates_step:
                     if gate.num_summands_decomposed > i:
                         #q_t = gate.qubits_t[0]
@@ -185,12 +190,13 @@ class QuantumCircuit():
                         for q_t in gate.qubits_t:
                             if use_alternative_repr and gate.is_parametric and hasattr(gate, 'matrix22_t_alt'):
                                 
-                                gates[q_t] = gate.matrix22_t_alt[q_t][i]
+                                gates[q_t] = gate.matrix22_t_alt[q_t][i] if not gate.treat_numeric_only else sp.Matrix(2,2,gate.matrix22_t_numeric[q_t][i].flatten())
                             else:
-                                gates[q_t] = gate.matrix22_t[q_t][i]
+                                gates[q_t] = gate.matrix22_t[q_t][i]     if not gate.treat_numeric_only else sp.Matrix(2,2,gate.matrix22_t_numeric[q_t][i].flatten())
                                 if replace_symbolic_zeros_and_ones:
                                     gates[q_t] = gates[q_t].xreplace({s: (sympy.core.numbers.Zero() if n == 0 else sympy.core.numbers.One()) for s,n in zip(gate.matrix22_t[q_t][i].flat(), 
                                                                                   gate.matrix22_t_numeric[q_t][i].flatten()) if n == 0 or n == 1})
+                        
                         #print(gates[q_t])
                         if gate.qubits_c is not None:
                             #q_c = gate.qubits_c[0]
@@ -207,16 +213,30 @@ class QuantumCircuit():
                         #gates[j] = Identity_Gate(qubits_t=[j], qubits_c=None, step=step).matrix22_t[j][0]
                         gates[j] = sp.eye(2)
                 gates = list(reversed(gates)) # reverse the list to match the order of the qubits (little endian) for the tensor product
-                assert all(isinstance(g, sp.MatrixBase) for g in gates)
-                assert all(all(isinstance(e, sp.Expr) for e in g) for g in gates)
+                #print('gates for tensor product:')
+                #print(gates)
+                #assert all(isinstance(g, sp.MatrixBase) for g in gates)
+                #assert all(all(isinstance(e, sp.Expr) for e in g) for g in gates)
                 #_tmp_unitary = gates[0]
                 #for j in range(1, len(gates)):
                     #print(j, gates[j])
                 #    _tmp_unitary = sp_phy_qant.TensorProduct(_tmp_unitary, gates[j])
                 #display(_tmp_unitary)
+                #_tmp_unitary = sp_phy_qant.TensorProduct(*gates).doit()
                 _tmp_unitary = sp_phy_qant.TensorProduct(*gates)
+                
+                #print('step', step, 'sum index', i)
+                #print(gates)
+                #print(_tmp_unitary)
+                #unitary_step += _tmp_unitary.doit()
                 unitary_step += _tmp_unitary
-            self.unitary = unitary_step @ self.unitary
+                unitary_step = sympy.simplify(unitary_step)
+                
+            self.unitary = unitary_step * self.unitary
+            #self.unitary = self.unitary.doit()
+            #self.unitary = self.unitary.simplify()
+            #self.unitary = self.unitary
+            #print('step:', step, self.unitary)
     
     def subs_symbolic_zerosones_in_symbolic_unitary(self, zeros: bool=True, ones: bool=True):
         '''Substitute entries in the symbolic unitary that are zero with zeros.'''
@@ -290,29 +310,37 @@ class QuantumCircuit():
         
         self.unitary = self.unitary.xreplace(dict_for_subs)
 
-    def create_numeric_unitary_from_symbolic(self):
+    def create_numeric_unitary_from_symbolic(self, use_alternative_repr:bool=False):
         # subs_symbolic_zerosones_in_symbolic_unitary based on this function, so if making changes to either you might want to adapt the other as well 
         self.unitary_numeric = self.unitary.copy()
         dict_for_subs = {}
         for gate_type, gates in self.gate_collection.collections.items():
             for gate in gates:
-                print(gate)
+                #print(gate)
                 for i in range(gate.num_summands_decomposed):
-                    symbs_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t[q_t][i].flat()]
+                    if use_alternative_repr and gate.is_parametric:
+                        #print('using alternative repr', gate)
+                        symbs_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t_alt[q_t][i].flat()]
+                    else:
+                        symbs_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t[q_t][i].flat()]
                     nums_t = [e for q_t in gate.qubits_t for e in gate.matrix22_t_numeric[q_t][i].flatten()]
-                    print(symbs_t)
-                    print(nums_t)
-                    _di_tmp = {s: n for s, n in zip(symbs_t, nums_t)}
+                    #print(symbs_t)
+                    #print(nums_t)
+                    _di_tmp = {s: n for s, n in zip(symbs_t, nums_t) if not isinstance(s, (sympy.core.numbers.Zero, sympy.core.numbers.One))}
+                    #print(_di_tmp)
                     assert all(k not in dict_for_subs for k in _di_tmp.keys()), 'Conflict in substitutions, some symbols appear multiple times.'
                     dict_for_subs.update(_di_tmp)
                     
                     if gate.qubits_c is not None:
                         symbs_c = [e for q_c in gate.qubits_c for e in gate.matrix22_c[q_c][i].flat()]
                         nums_c = [e for q_c in gate.qubits_c for e in gate.matrix22_c_numeric[q_c][i].flatten()]
-                        _di_tmp = {s: n for s, n in zip(symbs_c, nums_c)}
+                        _di_tmp = {s: n for s, n in zip(symbs_c, nums_c) if not isinstance(s, (sympy.core.numbers.Zero, sympy.core.numbers.One))}
+                        #print([k for k in _di_tmp.keys()])
+                        #print([k for k in dict_for_subs.keys()])
                         assert all(k not in dict_for_subs for k in _di_tmp.keys()), 'Conflict in substitutions, some symbols appear multiple times.'
                         dict_for_subs.update(_di_tmp)
-        
+        #for k, v in dict_for_subs.items():
+        #    print(f'{k} -> {v}')
         self.unitary_numeric = self.unitary_numeric.xreplace(dict_for_subs)
     
 class QuantumState():
@@ -430,7 +458,7 @@ def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program) -> QuantumCircuit:
         if isinstance(s, openqasm3.ast.Include):
             print('Included filenames:', s.filename)
             if s.filename != 'stdgates.inc':
-                raise ValueError('Only stdgates.inc is supported as include file, not:', s.filename)
+                print(Warning('Only stdgates.inc is supported as include file, not:', s.filename))
         elif isinstance(s, openqasm3.ast.ClassicalDeclaration):
             if isinstance(s.type, openqasm3.ast.BitType):
                 if not qc.context.has_creg(s.identifier.name):
@@ -476,6 +504,7 @@ def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program) -> QuantumCircuit:
                 raise ValueError('Unknown gate arguments:', _gate_arguments)
             
             _gate_qubits = s.qubits
+            #print('  Gate qubits:', _gate_qubits)
             assert isinstance(_gate_qubits, list), f'expected list for gate qubits: {_gate_qubits}'
             _gate_qubits_glob_ids = []
             for _q in _gate_qubits:
@@ -506,9 +535,9 @@ def _iterate_over_qasm_statements(qpf:openqasm3.ast.Program) -> QuantumCircuit:
                 _gate_set_step = set(_gate_qubits_glob_ids)
             print('Adding gate at step:', _step)
             print('  Gate qubits global IDs:', _gate_qubits_glob_ids)
-
+            
             _parameters = {k:v for (k,v) in zip(_gate_target.parameters, _list_gate_arguments)} if _gate_arguments != [] else None
-            qc.add_gate(name=_gate_target.name_gate_collection, qubits_t=_gate_qubits_glob_ids[:_n_q_t], qubits_c=_gate_qubits_glob_ids[_n_q_t:_n_q_t+_n_q_c], step=_step,
+            qc.add_gate(name=_gate_target.name_gate_collection, qubits_t=_gate_qubits_glob_ids[_n_q_c:_n_q_c+_n_q_t], qubits_c=_gate_qubits_glob_ids[:_n_q_c], step=_step,
                          parameters=_parameters)
             print('Quantum gate name:', _gate_name)
             print('Quantum gate arguments:', _gate_arguments)

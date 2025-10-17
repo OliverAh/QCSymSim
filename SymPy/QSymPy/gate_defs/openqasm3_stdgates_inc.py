@@ -310,7 +310,9 @@ class CX_Gate(QuantumGateMultiQubit):
         assert len(qubits_c) == 1, 'CX gate can only be applied to a single control qubit.'
         assert qubits_t[0] != qubits_c[0], 'Control and target qubit must be different.'
         super().__init__(name='CX', name_short='CX', shape=(4,4), qubits_t=qubits_t, qubits_c=qubits_c, step=step, num_summands_decomposed=2,
-                         gates_t={qubits_t[0]: ('I','X')}, control_values_c={qubits_c[0]:(0,1)})
+                        gates_t={qubits_t[0]: ('I','X')}, control_values_c={qubits_c[0]:(0,1)})
+        #super().__init__(name='CX', name_short='CX', shape=(4,4), qubits_t=qubits_c, qubits_c=qubits_t, step=step, num_summands_decomposed=2,
+        #                 gates_t={qubits_c[0]: ('I','X')}, control_values_c={qubits_t[0]:(0,1)})
 
 class CCX_Gate(QuantumGateMultiQubit):
     is_should_be_listed_in_gate_collection = True
@@ -423,6 +425,7 @@ class CP_Gate(QuantumGateMultiQubit):
     name_gate_collection = 'CP'
     num_qubits_t = 1
     num_qubits_c = 1
+    is_parametric = True
     parameters = ('lambda',)
     def __init__(self, qubits_t: tuple|list[int]=[0], qubits_c: tuple|list[int]=None, step: int=0, parameters: dict=None):
         assert len(qubits_t) == 1, 'CP gate can only be applied to a single target qubit.'
@@ -507,7 +510,8 @@ class SWAP_Gate(QuantumGateMultiQubit):
         self.matrix = sp.Rational(1,2) * self.matrix
         self.matrix_numeric = 1/2 * self.matrix_numeric
         #self.matrix22_t = {key: [sp.Rational(1, sp.Pow(2, 1/2))*m for m in l] for key,l in self.matrix22_t.items()}
-        self.matrix22_t[qubits_t[0]] = [1/2*m for m in self.matrix22_t[qubits_t[0]]] # avoids evaluation of sp.Pow(2, 1/2) as float
+        #self.matrix22_t[qubits_t[0]] = [1/sp.sqrt(2)*m for m in self.matrix22_t[qubits_t[0]]] # avoids evaluation of sp.Pow(2, 1/2) as float
+        #self.matrix22_t[qubits_t[1]] = [1/sp.sqrt(2)*m for m in self.matrix22_t[qubits_t[1]]] # avoids evaluation of sp.Pow(2, 1/2) as float
         self.matrix22_t_numeric = {key: [1/np.sqrt(2)*m for m in l] for key,l in self.matrix22_t_numeric.items()}
 
 class CSWAP_Gate(QuantumGateMultiQubit):
