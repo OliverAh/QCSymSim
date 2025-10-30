@@ -1,5 +1,12 @@
+*.tmp
+*.svg
 *.png
 *.npy
+*.qasm*
+zz_temp/
+*copy*
+
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

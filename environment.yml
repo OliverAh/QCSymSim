@@ -17,3 +17,5 @@ dependencies:
   - pylatexenc
   - pytest
   - pytest-cov
+  - python-symengine
+  - python-dotenv
