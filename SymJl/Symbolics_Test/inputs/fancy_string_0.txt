@@ -1,0 +1,1 @@
+sin(sin(x)) + Derivative(sin(x), x)
