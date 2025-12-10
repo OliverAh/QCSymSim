@@ -75,7 +75,7 @@ class QuantumGate:
         str_qubits_c = ''.join([str(q)+'' for q in qubits_c]) if qubits_c is not None else ''
         self.atomics = {sub: sp.symbols(self.name+'_qt'+str_qubits_t+'_qc'+str_qubits_c+'_s'+str(step)+'_p'+str(sub[0])+str(sub[1])
                                         , complex=True, finite=True, extended_finite=False) for sub in iter_indices} # {'00': I_qt0_qc0_s0_p00, '01': I_qt0_qc0_s0_p01, ...}
-        self.matrix = sp.Matrix([[self.atomics[col] for col in itertools.islice(iter_indices, row*shape[1], row*shape[1]+shape[1])] for row in range(shape[0])]) # [[I_..._p00, I_..._p01], [I_..._p10, I_..._p11]]
+        self.matrix = sp.ImmutableMatrix([[self.atomics[col] for col in itertools.islice(iter_indices, row*shape[1], row*shape[1]+shape[1])] for row in range(shape[0])]) # [[I_..._p00, I_..._p01], [I_..._p10, I_..._p11]]
         self.ids_matrix_zeros = None
         self.matrix_numeric = None
         self.qubits = [qubits_t] if qubits_c is None else [qubits_t, qubits_c]

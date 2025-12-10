@@ -20,4 +20,3 @@ dependencies:
   - python-symengine
   - python-dotenv
   - python-graphviz
-  - graphviz
