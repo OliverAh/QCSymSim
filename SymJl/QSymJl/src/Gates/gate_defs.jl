@@ -1,7 +1,7 @@
 import Symbolics
 
 struct _00_Gate <: AbstractInternalSingleQubitQuantumGate
-    function _00_Gate(name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    function _00_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
         matrix_numeric = [1 0; 0 0]
         base_gate = make_BaseQuantumGate(name=name, name_short="_00", shape=(2,2),
         qubits_t=qubits_t, qubits_c=nothing, step=step, num_summands_decomposed=1,
@@ -12,7 +12,7 @@ struct _00_Gate <: AbstractInternalSingleQubitQuantumGate
 end
 
 struct _11_Gate <: AbstractInternalSingleQubitQuantumGate
-    function _11_Gate(name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    function _11_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
         matrix_numeric = [0 0; 0 1]
         base_gate = make_BaseQuantumGate(name=name, name_short="_11", shape=(2,2),
         qubits_t=qubits_t, qubits_c=nothing, step=step, num_summands_decomposed=1,
@@ -23,7 +23,7 @@ struct _11_Gate <: AbstractInternalSingleQubitQuantumGate
 end
 
 struct I_Gate <: AbstractSingleQubitQuantumGate
-    function I_Gate(name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    function I_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
         matrix_numeric = [1 0; 0 1]
         base_gate = make_BaseQuantumGate(name=name, name_short="I", shape=(2,2),
         qubits_t=qubits_t, qubits_c=nothing, step=step, num_summands_decomposed=1,
@@ -34,7 +34,7 @@ struct I_Gate <: AbstractSingleQubitQuantumGate
 end
 
 struct X_Gate <: AbstractSingleQubitQuantumGate
-    function X_Gate(name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    function X_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
         matrix_numeric = [0 1; 1 0]
         base_gate = make_BaseQuantumGate(name=name, name_short="X", shape=(2,2),
         qubits_t=qubits_t, qubits_c=nothing, step=step, num_summands_decomposed=1,
@@ -45,7 +45,7 @@ struct X_Gate <: AbstractSingleQubitQuantumGate
 end
 
 struct H_Gate <: AbstractSingleQubitQuantumGate
-    function H_Gate(name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    function H_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
         matrix_numeric = (1/sqrt(2))*[1 1; 1 -1]
         base_gate = make_BaseQuantumGate(name=name, name_short="H", shape=(2,2),
         qubits_t=qubits_t, qubits_c=nothing, step=step, num_summands_decomposed=1,
@@ -58,7 +58,7 @@ struct H_Gate <: AbstractSingleQubitQuantumGate
 end
 
 struct CX_Gate <: AbstractMultiQubitQuantumGate
-    function CX_Gate(name::AbstractString, qubits_t::Array{Int,1}, qubits_c::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    function CX_Gate(;name::AbstractString, qubits_t::Array{Int,1}, qubits_c::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
         gates_t = Dict(qubits_t[1] => (I_Gate, X_Gate))
         gates_c = Dict(qubits_c[1] => (_00_Gate, _11_Gate))
         println(nameof(I_Gate))

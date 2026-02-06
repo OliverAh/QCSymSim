@@ -1,7 +1,8 @@
 import Symbolics
 import SymbolicUtils
 
-abstract type AbstractQuantumGate end
+abstract type AbstractGate end
+abstract type AbstractQuantumGate <: AbstractGate end
 abstract type AbstractSingleQubitQuantumGate <: AbstractQuantumGate end
 abstract type AbstractMultiQubitQuantumGate <: AbstractQuantumGate end
 abstract type AbstractInternalSingleQubitQuantumGate <: AbstractSingleQubitQuantumGate end
@@ -116,14 +117,14 @@ function make_MultiQubitQuantumGate(;name::String, name_short::String, qubits_t:
         tmp_gates22_t[qt] = []
         for gtt in gt
             _name = first(rsplit(replace(string(nameof(gtt)), "_Gate" => "") * "_" * tmp_name, "_", limit=2))
-            push!(tmp_gates22_t[qt], gtt(_name, Array{Int,1}([qt]), step, is_treat_numeric_only))
+            push!(tmp_gates22_t[qt], gtt(name=_name, qubits_t=Array{Int,1}([qt]), step=step, is_treat_numeric_only=is_treat_numeric_only))
         end
     end
     for (qc, gc) in gates_c
         tmp_gates22_c[qc] = []
         for gcc in gc
             _name = first(rsplit(replace(string(nameof(gcc)), "_Gate" => "") * "_" * tmp_name, "_", limit=2))
-            push!(tmp_gates22_c[qc], gcc(_name, Array{Int,1}([qc]), step, is_treat_numeric_only))
+            push!(tmp_gates22_c[qc], gcc(name=_name, qubits_t=Array{Int,1}([qc]), step=step, is_treat_numeric_only=is_treat_numeric_only))
         end
     end
     matrix22_t = Dict(q => collect(getfield(gg, :matrix) for gg in g) for (q, g) in tmp_gates22_t)
