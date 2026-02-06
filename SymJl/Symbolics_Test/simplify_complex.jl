@@ -1,10 +1,10 @@
 using Symbolics
 
 example = [
-    # "small",
-    "intermediate", 
+    #"small",
+    #"intermediate", 
     #"large",
-    #"very_large"
+    "very_large"
 ]
 
 
@@ -34,3 +34,9 @@ simplified_symbolics_expression_dthetasomething = Symbolics.derivative.(simplifi
 println("Took derivative of simplified expression")
 tmp = isequal(simplified_symbolics_expression_dthetasomething, simplified_symbolics_expression)
 println("Derivative check complete, same? ", tmp)
+
+# display(simplified_symbolics_expression)
+# println(typeof(simplified_symbolics_expression))
+
+# display(simplified_symbolics_expression_dthetasomething)
+# println(typeof(simplified_symbolics_expression_dthetasomething))
