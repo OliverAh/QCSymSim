@@ -1,4 +1,10 @@
 import Symbolics
+import ..BitsRegs.AbstractBit
+#import ..BitsRegs.Bit
+import ..BitsRegs.MapBitID
+import ..BitsRegs.QBit
+
+abstract type Bit <: AbstractBit end
 
 struct _00_Gate <: AbstractInternalSingleQubitQuantumGate
     function _00_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
@@ -44,8 +50,8 @@ struct X_Gate <: AbstractSingleQubitQuantumGate
     end
 end
 
-struct H_Gate <: AbstractSingleQubitQuantumGate
-    function H_Gate(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+struct H_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate
+    function H_Gate{T}(;name::AbstractString, qubits_t::AbstractArray{T,1}, step::UInt, is_treat_numeric_only::Bool) where {T<:AbstractBit}
         matrix_numeric = (1/sqrt(2))*[1 1; 1 -1]
         base_gate = make_BaseQuantumGate(name=name, name_short="H", shape=(2,2),
         qubits_t=qubits_t, qubits_c=nothing, step=step, num_summands_decomposed=1,
@@ -55,6 +61,13 @@ struct H_Gate <: AbstractSingleQubitQuantumGate
         #base_gate.matrix_alt = Symbolics.scalarize(base_gate.matrix_alt)
         return base_gate
     end
+end
+function H_Gate_outer(;name::AbstractString, qubits_t::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool)
+    println("ended up in OUTER constructor")
+    context = MapBitID()
+    qubits_t_new = collect(QBit(context=context) for q in qubits_t)
+    println(typeof(qubits_t_new))
+    return H_Gate{typeof(qubits_t_new[1])}(name=name, qubits_t=qubits_t_new, step=step, is_treat_numeric_only=is_treat_numeric_only)
 end
 
 struct CX_Gate <: AbstractMultiQubitQuantumGate

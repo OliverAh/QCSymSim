@@ -1,5 +1,6 @@
 import Symbolics
 import SymbolicUtils
+import ..BitsRegs.AbstractBit
 
 abstract type AbstractGate end
 abstract type AbstractQuantumGate <: AbstractGate end
@@ -7,7 +8,7 @@ abstract type AbstractSingleQubitQuantumGate <: AbstractQuantumGate end
 abstract type AbstractMultiQubitQuantumGate <: AbstractQuantumGate end
 abstract type AbstractInternalSingleQubitQuantumGate <: AbstractSingleQubitQuantumGate end
 
-@kwdef mutable struct BaseQuantumGate <: AbstractQuantumGate
+@kwdef struct BaseQuantumGate{T<:AbstractBit} <: AbstractQuantumGate
     #is_should_be_listed_in_gate_collection::Bool
     #name_gate_collection::Union{Nothing, String}
     num_qubits::UInt
@@ -19,9 +20,9 @@ abstract type AbstractInternalSingleQubitQuantumGate <: AbstractSingleQubitQuant
     name::String
     name_short::String
     shape::Tuple{Int, Int}
-    qubits::                 Array{Int,1}
-    qubits_t::               Array{Int,1}
-    qubits_c::Union{Nothing, Array{Int,1}}
+    qubits::                 Array{T,1}
+    qubits_t::               Array{T,1}
+    qubits_c::Union{Nothing, Array{T,1}}
     step::UInt
     num_summands_decomposed::UInt
     parameters::Union{Nothing, Vector{Dict{String, Complex}}}
@@ -38,18 +39,18 @@ abstract type AbstractInternalSingleQubitQuantumGate <: AbstractSingleQubitQuant
     matrix22_c_numeric::Union{Nothing, Dict{UInt, Vector{Array{Complex,2}}}}
 end
 
-function _generate_name_str(name::AbstractString, step::UInt, qubits_t::Array{Int,1}, qubits_c::Union{Nothing, Array{Int,1}})
-    return name * "_s" * string(step) * "qt" * join(qubits_t, "") * "qc" * (isnothing(qubits_c) ? "" : join(qubits_c, ""))
+function _generate_name_str(name::AbstractString, step::UInt, qubits_t::Array{T,1}, qubits_c::Union{Nothing, Array{AbstractBit,1}}) where {T<:AbstractBit}
+    return name * "_s" * string(step) * "qt" * join((q.index_global for q in qubits_t), "") * "qc" * (isnothing(qubits_c) ? "" : join((q.index_global for q in qubits_c), ""))
 end
 
-function _determine_num_qubits(qubits_t::Array{Int,1}, qubits_c::Union{Nothing, Array{Int,1}})
+function _determine_num_qubits(qubits_t::Array{T,1}, qubits_c::Union{Nothing, Array{T,1}}) where {T<:AbstractBit}
     num_qubits_t = size(qubits_t,1)
     num_qubits_c = isnothing(qubits_c) ? 0 : size(qubits_c,1)
     return num_qubits_t + num_qubits_c, num_qubits_t, num_qubits_c
 end
 
 function make_BaseQuantumGate(;name="", name_short="", shape=(0,0),
-    qubits_t=zeros(Int,0), qubits_c=nothing,
+    qubits_t=zeros(AbstractBit,0), qubits_c=nothing,
     step=0, num_summands_decomposed=0, parameters=nothing, is_treat_numeric_only=false,
     ids_matrix_zeros=nothing, matrix_numeric=nothing, matrix22_t=nothing, matrix22_t_alt=nothing,
     matrix22_c=nothing, matrix22_t_numeric=nothing, matrix22_c_numeric=nothing
@@ -82,7 +83,7 @@ function make_SingleQubitQuantumGate(;name="", name_short="",
     ids_matrix_zeros=nothing, matrix_numeric=nothing, matrix22_t=nothing, matrix22_t_alt=nothing,
     matrix22_c=nothing, matrix22_t_numeric=nothing, matrix22_c_numeric=nothing
     )
-    qubits_t = Array{Uint,1}(qubits_t)
+    qubits_t = Array{AbstractBit,1}(qubits_t)
     base_gate = make_BaseQuantumGate(name=name, name_short=name_short, shape=(2,2),
     qubits_t=qubits_t, qubits_c=qubits_c,
     step=step, num_summands_decomposed=num_summands_decomposed, parameters=parameters, is_treat_numeric_only=is_treat_numeric_only,
@@ -94,7 +95,7 @@ function make_SingleQubitQuantumGate(;name="", name_short="",
     return base_gate
 end
 
-function make_MultiQubitQuantumGate(;name::String, name_short::String, qubits_t::Array{Int,1}, qubits_c::Array{Int,1}, step::UInt, is_treat_numeric_only::Bool, parameters::Union{Nothing, Vector{Dict{String, Complex}}}, gates_t, gates_c, ids_matrix_zeros=nothing, matrix_numeric=nothing)
+function make_MultiQubitQuantumGate(;name::String, name_short::String, qubits_t::Array{AbstractBit,1}, qubits_c::Union{Nothing,Array{AbstractBit,1}}, step::UInt, is_treat_numeric_only::Bool, parameters::Union{Nothing, Vector{Dict{String, Complex}}}, gates_t, gates_c, ids_matrix_zeros=nothing, matrix_numeric=nothing)
     tmp_name = _generate_name_str(name, step, qubits_t, qubits_c)
     println(tmp_name)
     num_qubits, num_qubits_t, num_qubits_c = _determine_num_qubits(qubits_t, qubits_c)
@@ -117,14 +118,14 @@ function make_MultiQubitQuantumGate(;name::String, name_short::String, qubits_t:
         tmp_gates22_t[qt] = []
         for gtt in gt
             _name = first(rsplit(replace(string(nameof(gtt)), "_Gate" => "") * "_" * tmp_name, "_", limit=2))
-            push!(tmp_gates22_t[qt], gtt(name=_name, qubits_t=Array{Int,1}([qt]), step=step, is_treat_numeric_only=is_treat_numeric_only))
+            push!(tmp_gates22_t[qt], gtt(name=_name, qubits_t=Array{AbstractBit,1}([qt]), step=step, is_treat_numeric_only=is_treat_numeric_only))
         end
     end
     for (qc, gc) in gates_c
         tmp_gates22_c[qc] = []
         for gcc in gc
             _name = first(rsplit(replace(string(nameof(gcc)), "_Gate" => "") * "_" * tmp_name, "_", limit=2))
-            push!(tmp_gates22_c[qc], gcc(name=_name, qubits_t=Array{Int,1}([qc]), step=step, is_treat_numeric_only=is_treat_numeric_only))
+            push!(tmp_gates22_c[qc], gcc(name=_name, qubits_t=Array{AbstractBit,1}([qc]), step=step, is_treat_numeric_only=is_treat_numeric_only))
         end
     end
     matrix22_t = Dict(q => collect(getfield(gg, :matrix) for gg in g) for (q, g) in tmp_gates22_t)
@@ -143,9 +144,9 @@ function make_MultiQubitQuantumGate(;name::String, name_short::String, qubits_t:
     )
 end
 
-Base.show(io::IO, gate::BaseQuantumGate) = begin
+Base.show(io::IO, gate::T) where {T <: BaseQuantumGate} = begin
     println(io, "Quantum Gate: ", gate.name)
     for name in fieldnames(typeof(gate))
         println(io, "  ", name, ": ", getfield(gate, name))
-    end    
+    end
 end
