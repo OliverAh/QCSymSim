@@ -1,3 +1,4 @@
+import MacroTools
 """
 Copied from Lazy.jl
 
@@ -18,11 +19,14 @@ end
 @forward Wrapper.x (Base.length, Base.getindex, Base.iterate)  # equivalent to above
 ```
 """
+
 macro forward(ex, fs)
-  @capture(ex, T_.field_) || error("Syntax: @forward T.x f, g, h")
+  MacroTools.@capture(ex, T_.field_) || error("Syntax: @forward T.x f, g, h")
   T = esc(T)
   fs = isexpr(fs, :tuple) ? map(esc, fs.args) : [esc(fs)]
   :($([:($f(x::$T, args...; kwargs...) = (Base.@_inline_meta; $f(x.$field, args...; kwargs...)))
        for f in fs]...);
     nothing)
 end
+
+
