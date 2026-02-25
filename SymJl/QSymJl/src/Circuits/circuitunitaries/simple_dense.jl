@@ -14,7 +14,7 @@ order; multiple gates at the same step must act on disjoint qubits.
 
 Returns a `2^n × 2^n` symbolic matrix, where `n = get_num_qubits(qc)`.
 """
-function assemble_unitary(qc::QuantumCircuit)
+function assemble_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false, replace_symbolic_ones::Bool=false)
     n   = get_num_qubits(qc)
     dim = 2^n
 
@@ -54,7 +54,15 @@ function assemble_unitary(qc::QuantumCircuit)
             #p = qubit_pos[(gate.qubits_t[1].name_reg, Int(gate.qubits_t[1].index_local))]
             p = gate.qubits_t[1].index_global
             #qubit_mat[p] = Matrix(Symbolics.scalarize(gate.matrix))
-            qubit_mat[p] = gate.matrix
+            qubit_mat[p] = begin
+                if gate.is_treat_numeric_only
+                    gate.matrix_numeric
+                elseif gate.is_treat_alt_only
+                    gate.matrix_alt
+                else
+                    gate.matrix
+                end
+            end
         end
 
         # Assemble step unitary for single-qubit layer via Kronecker product
@@ -65,10 +73,20 @@ function assemble_unitary(qc::QuantumCircuit)
         for gate in multi_gates
             #positions  = sort([qubit_pos[(q.name_reg, Int(q.index_local))] for q in gate.qubits])
             positions  = sort([q.index_global for q in gate.qubits])
-            gate_mat   = Matrix(Symbolics.scalarize(gate.matrix))
+            gate_mat   = begin
+                if gate.is_treat_numeric_only
+                    gate.matrix_numeric
+                elseif gate.is_treat_alt_only
+                    gate.matrix_alt
+                else
+                    gate.matrix
+                end
+            end
             embedded   = _embed_gate(gate_mat, positions, n)
             step_U     = embedded * step_U
         end
+
+        step_U = _replace_symbolic_zeros_and_ones(step_U, gates_at_step, replace_symbolic_zeros, replace_symbolic_ones)
         U_total = step_U * U_total
         display(step_U)
         display(U_total)
@@ -95,7 +113,7 @@ MSB = position 1) into the full `2^n_total × 2^n_total` Hilbert space by
 distributing gate matrix elements over the correct basis indices while treating
 all non-gate qubits as spectators.
 """
-function _embed_gate(gate_matrix::Matrix, qubits_global_indices::Vector{Int}, n_total::Int)
+function _embed_gate(gate_matrix::Union{Matrix, Symbolics.Arr{Symbolics.Num, 2}}, qubits_global_indices::Vector{Int}, n_total::Int)
     k = length(qubits_global_indices)
     @assert size(gate_matrix) == (2^k, 2^k) "Gate matrix size $(size(gate_matrix)) inconsistent with $(k) qubits"
 

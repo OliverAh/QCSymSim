@@ -87,5 +87,26 @@ function add_gate(circuit::QuantumCircuit, gate::Type{T}; kwargs...) where {T <:
 end
 
 function assemble_symbolic_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false, replace_symbolic_ones::Bool=false)
-    return assemble_unitary(qc)
+    return assemble_unitary(qc, replace_symbolic_zeros, replace_symbolic_ones)
+end
+
+function _replace_symbolic_zeros_and_ones(U::Matrix{T}, gates::AbstractVector{<:Gates.AbstractGate}, replace_symbolic_zeros::Bool, replace_symbolic_ones::Bool) where {T<:Union{Symbolics.Num, Complex{Symbolics.Num}}}
+    
+    dict_to_replace = Dict{Symbolics.Num, Complex}()
+    for g in gates
+        if g.matrix_numeric === nothing
+            continue
+        end
+        if replace_symbolic_zeros
+            for id_zero in findall(x -> x == 0, g.matrix_numeric)
+                dict_to_replace[g.matrix[id_zero]] = 0
+            end
+        end
+        if replace_symbolic_ones
+            for id_one in findall(x -> x == 1, g.matrix_numeric)
+                dict_to_replace[g.matrix[id_one]] = 1
+            end
+        end
+    end
+    return Symbolics.substitute.(U, (dict_to_replace,))
 end

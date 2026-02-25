@@ -17,6 +17,7 @@ macro insert_fields_AbstractQuantumGate()
         $(esc(:(num_qubits_c::Union{Nothing, Int})))
         $(esc(:(is_parametric::Bool)))
         $(esc(:(is_treat_numeric_only::Bool)))
+        $(esc(:(is_treat_alt_only::Bool)))
         $(esc(:(name::String)))
         $(esc(:(name_short::String)))
         $(esc(:(shape::Tuple{Int, Int})))
@@ -25,11 +26,11 @@ macro insert_fields_AbstractQuantumGate()
         $(esc(:(qubits_c::Union{Nothing, Array{T,1}})))
         $(esc(:(step::Int)))
         $(esc(:(num_summands_decomposed::Int)))
-        $(esc(:(parameters::Union{Nothing, Vector{Dict{String, Complex}}})))
+        $(esc(:(parameters::Union{Nothing, Dict{Symbolics.Num, <:Real}})))
         $(esc(:(atomics::Vector{<:Symbolics.Num})))
         $(esc(:(atomics_alt::Union{Nothing, Vector{<:Symbolics.Num}})))
         $(esc(:(matrix::Symbolics.Arr{Symbolics.Num,2})))
-        $(esc(:(matrix_alt::Union{Nothing, Matrix{Symbolics.Num}, Symbolics.Arr{Symbolics.Num,2}, SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}})))
+        $(esc(:(matrix_alt::Union{Nothing, Matrix{Symbolics.Num}, Matrix{Complex{Symbolics.Num}}, Symbolics.Arr{Symbolics.Num,2}, SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}})))
         $(esc(:(ids_matrix_zeros::Union{Nothing, Array{Int, 2}})))
         $(esc(:(matrix_numeric::Union{Nothing, Array{Complex,2}})))
         $(esc(:(matrix22_t::Union{Nothing, Dict{Int, Vector{Symbolics.Arr{Symbolics.Num,2}}}})))
@@ -49,13 +50,14 @@ mutable struct mutable_BaseQuantumGate_for_construction{T<:AbstractBit} <: Abstr
     # ids_matrix_zeros=nothing, matrix_numeric=nothing, matrix22_t=nothing, matrix22_t_alt=nothing,
     # matrix22_c=nothing, matrix22_t_numeric=nothing, matrix22_c_numeric=nothing)
     function mutable_BaseQuantumGate_for_construction(; 
-        is_parametric::Bool, is_treat_numeric_only::Bool, 
+        is_treat_numeric_only::Bool,
         name_prefix::String, name_short::String, qubits_t::Vector{T}, qubits_c::Union{Nothing, Vector{T}}=nothing,
-        step::Int, num_summands_decomposed::Int) where {T<:AbstractBit}
+        step::Int, num_summands_decomposed::Int, parameters::Union{Nothing, Vector{Symbolics.Num}, Dict{Symbolics.Num, <:Complex}, Dict{Symbolics.Num, <:Real}}=nothing) where {T<:AbstractBit}
         
         num_qubits, num_qubits_t, num_qubits_c = _determine_num_qubits(qubits_t, qubits_c)
-        is_parametric = is_parametric
+        is_parametric = parameters !== nothing
         is_treat_numeric_only = is_treat_numeric_only
+        is_treat_alt_only = false
         name=_generate_name_str(name_prefix*name_short, step, qubits_t, qubits_c)
         name_short=name_short
         shape=(2^num_qubits, 2^num_qubits)
@@ -64,10 +66,19 @@ mutable struct mutable_BaseQuantumGate_for_construction{T<:AbstractBit} <: Abstr
         qubits = isnothing(qubits_c) ? qubits_t : vcat(qubits_t, qubits_c)
         step=step
         num_summands_decomposed=num_summands_decomposed
-        parameters = is_parametric ? Vector{Dict{String, Complex}}() : nothing
-        
+        if is_parametric
+            if parameters isa Vector{Symbolics.Num}
+                parameters = Dict(p => 0.0 for p in parameters)
+            elseif parameters isa Dict{Symbolics.Num, <:Complex}
+                parameters = parameters
+            elseif parameters isa Dict{Symbolics.Num, <:Real}
+                parameters = parameters
+            else
+                error("parameters must be either a Vector{Symbolics.Num} or a Dict{Symbolics.Num, <:Complex} or a Dict{Symbolics.Num, <:Real}")
+            end
+        end        
         atomics = nothing # will be set after matrix
-        atomics_alt = nothing
+        atomics_alt = parameters === nothing ? nothing : collect(keys(parameters))
         matrix = eval(Meta.parse("Symbolics.@variables($(name)[1:$(shape[1]),1:$(shape[2])])"))
         matrix = matrix[1]
         matrix_alt = nothing
@@ -84,7 +95,7 @@ mutable struct mutable_BaseQuantumGate_for_construction{T<:AbstractBit} <: Abstr
         
 
         return new{T}(num_qubits, num_qubits_t, num_qubits_c,
-            is_parametric, is_treat_numeric_only,
+            is_parametric, is_treat_numeric_only, is_treat_alt_only,
             name, name_short, shape, qubits, qubits_t, qubits_c,
             step, num_summands_decomposed, parameters, atomics, atomics_alt,
             matrix, matrix_alt, ids_matrix_zeros, matrix_numeric,
