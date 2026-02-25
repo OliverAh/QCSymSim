@@ -245,24 +245,6 @@ function RY_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{Q
     return RY_Gate(base_gate)
 end
 
-struct RY_OQ3_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
-    @insert_fields_AbstractQuantumGate()
-    @constructor_from_mutable_base(RY_OQ3_Gate, mutable_BaseQuantumGate_for_construction)
-    
-end
-
-function RY_OQ3_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
-    θ = Symbolics.@variables(θ::Real)[1]
-    base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
-        name_prefix=name_prefix, name_short="RY", qubits_t=qubits_t, qubits_c=nothing,
-        step=step, num_summands_decomposed=1, parameters = Dict(θ => 0.0))
-    
-    base_gate.matrix_alt = Matrix([cos(θ/2) sin(θ/2);
-                                   -sin(θ/2) cos(θ/2)])
-    base_gate.is_treat_alt_only = is_treat_alt_only
-    return RY_OQ3_Gate(base_gate)
-end
-
 struct RZ_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
     @insert_fields_AbstractQuantumGate()
     @constructor_from_mutable_base(RZ_Gate, mutable_BaseQuantumGate_for_construction)
@@ -275,7 +257,7 @@ function RZ_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{Q
         name_prefix=name_prefix, name_short="RZ", qubits_t=qubits_t, qubits_c=nothing,
         step=step, num_summands_decomposed=1, parameters = Dict(θ => 0.0))
     
-    base_gate.matrix_alt = Matrix([exp(1im*θ/2) 0.0;
+    base_gate.matrix_alt = Matrix([exp(-1im*θ/2) 0.0;
                                    0.0 exp(1im*θ/2)])
     base_gate.is_treat_alt_only = is_treat_alt_only
     return RZ_Gate(base_gate)
@@ -294,8 +276,9 @@ function RZ_OQ3_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVect
         step=step, num_summands_decomposed=1, parameters = Dict(θ => 0.0))
     
     base_gate.matrix_alt = Matrix([cos(θ/2) sin(θ/2);
-                                   -sin(θ/2) cos(θ/2)])
+                                   sin(θ/2) -cos(θ/2)])
     base_gate.is_treat_alt_only = is_treat_alt_only
+    throw(MethodError("There probably is a typo in the docs of OpenQasm3. Until this is clarified you probably want to use the usual RZ gate instead. See https://github.com/openqasm/openqasm/issues/660"))
     return RZ_OQ3_Gate(base_gate)
 end
 
