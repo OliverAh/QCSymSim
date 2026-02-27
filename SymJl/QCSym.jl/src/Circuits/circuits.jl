@@ -1,16 +1,20 @@
 import Symbolics
-import ..BitsRegs
-import ..Gates
+#import ..BitsRegs
+#import ..Gates
+#import ..Gates
+import ..QCSym
+#import QCSym.Gates
+#import QCSym.Gates
 
 struct GateCollection
-    collections::Dict{Type{<:Gates.AbstractGate}, Vector{Any}}
+    collections::Dict{Type{<:QCSym.Gates.AbstractGate}, Vector{Any}}
 end
 
 @kwdef struct QuantumCircuit
     name::String = "MyCircuit"
-    context::BitsRegs.MapBitID = BitsRegs.MapBitID()
-    qregs::Vector{<:BitsRegs.BitRegister{<:BitsRegs.AbstractQuantumBit}} = BitsRegs.BitRegister{BitsRegs.AbstractQuantumBit}[]
-    cregs::Vector{<:BitsRegs.BitRegister{<:BitsRegs.AbstractClassicalBit}} = BitsRegs.BitRegister{BitsRegs.AbstractClassicalBit}[]
+    context::QCSym.BitsRegs.MapBitID = QCSym.BitsRegs.MapBitID()
+    qregs::Vector{<:QCSym.BitsRegs.BitRegister{<:QCSym.BitsRegs.AbstractQuantumBit}} = QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.AbstractQuantumBit}[]
+    cregs::Vector{<:QCSym.BitsRegs.BitRegister{<:QCSym.BitsRegs.AbstractClassicalBit}} = QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.AbstractClassicalBit}[]
     gatecollection::GateCollection = GateCollection(Dict())
     barriers::Vector{Any} = Any[]
 end
@@ -56,32 +60,35 @@ Base.show(io::IO, qc::QuantumCircuit) = begin
 end
 
 function add_qreg(qc::QuantumCircuit, name::String="", size::Int=-1)
-    qreg = BitsRegs.add_qreg(qc.context, name, size)
-    #BitsRegs.add_qreg(qc.context,qreg)
+    qreg = QCSym.BitsRegs.add_qreg(qc.context, name, size)
+    #QCSym.BitsRegs.add_qreg(qc.context,qreg)
     push!(qc.qregs, qreg)
     return qreg
 end
 
 function add_creg(circuit::QuantumCircuit, name::String="", size::Int=-1)
     @assert !has_creg(circuit, name) "Classical register with name $name already exists"
-    creg = BitsRegs.add_creg(circuit.context, name, size)
+    creg = QCSym.BitsRegs.add_creg(circuit.context, name, size)
     push!(circuit.cregs, creg)
     return creg
 end
 
 function has_creg(qc::QuantumCircuit, name::String)
-    return BitsRegs.has_creg(qc.context, name)
+    return QCSym.BitsRegs.has_creg(qc.context, name)
 end
 
 function has_qreg(qc::QuantumCircuit, name::String)
-    return BitsRegs.has_qreg(qc.context, name)
+    return QCSym.BitsRegs.has_qreg(qc.context, name)
 end
 
 """kwargs are exclusively forwarded to the added gate. See their respective documentation."""
-function add_gate(circuit::QuantumCircuit, gate::Type{T}; kwargs...) where {T <: Gates.AbstractGate}
+function add_gate(circuit::QuantumCircuit, gate::Type{T}; kwargs...) where {T <: QCSym.Gates.AbstractGate}
     if !haskey(circuit.gatecollection.collections, gate)
         circuit.gatecollection.collections[gate] = Any[]
     end
+    println(nameof(T))
+    #println("$(gate)_for_Circuit")
+    #println(Meta.parse("$(gate)_for_Circuit"))
     gate_constructor = eval(Meta.parse("$(gate)_for_Circuit"))
     push!(circuit.gatecollection.collections[gate], gate_constructor(; kwargs...))
 end
@@ -90,7 +97,7 @@ function assemble_symbolic_unitary(qc::QuantumCircuit, replace_symbolic_zeros::B
     return assemble_unitary(qc, replace_symbolic_zeros, replace_symbolic_ones)
 end
 
-function _replace_symbolic_zeros_and_ones(U::Matrix{T}, gates::AbstractVector{<:Gates.AbstractGate}, replace_symbolic_zeros::Bool, replace_symbolic_ones::Bool) where {T<:Union{Symbolics.Num, Complex{Symbolics.Num}}}
+function _replace_symbolic_zeros_and_ones(U::Matrix{T}, gates::AbstractVector{<:QCSym.Gates.AbstractGate}, replace_symbolic_zeros::Bool, replace_symbolic_ones::Bool) where {T<:Union{Symbolics.Num, Complex{Symbolics.Num}}}
     
     dict_to_replace = Dict{Symbolics.Num, Complex}()
     for g in gates
