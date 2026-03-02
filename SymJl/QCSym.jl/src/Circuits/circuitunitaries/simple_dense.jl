@@ -32,14 +32,14 @@ function assemble_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false
         append!(all_gates, gates)
     end
 
-    isempty(all_gates) && return Matrix{Symbolics.Num}(LinearAlgebra.I, dim, dim)
+    isempty(all_gates) && return Matrix{Complex{Symbolics.Num}}(LinearAlgebra.I, dim, dim)
 
     # ── 3. Per-step assembly, steps applied in ascending order ───────────────────
     sorted_steps = sort(unique(g.step for g in all_gates))
 
     # Start with the identity; steps are pre-multiplied on the left: U = U_last * … * U_1
     I2        = Matrix{Int}([1 0; 0 1])
-    U_total   = Matrix{Symbolics.Num}(LinearAlgebra.I, dim, dim)
+    U_total   = Matrix{Complex{Symbolics.Num}}(LinearAlgebra.I, dim, dim)
 
     for step in sorted_steps
         gates_at_step = [g for g in all_gates if g.step == step]
@@ -72,7 +72,8 @@ function assemble_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false
         # Embed and multiply in multi-qubit gates
         for gate in multi_gates
             #positions  = sort([qubit_pos[(q.name_reg, Int(q.index_local))] for q in gate.qubits])
-            positions  = sort([q.index_global for q in gate.qubits])
+            #positions  = sort([q.index_global for q in gate.qubits])
+            positions  = collect([q.index_global for q in gate.qubits])
             gate_mat   = begin
                 if gate.is_treat_numeric_only
                     gate.matrix_numeric
@@ -88,8 +89,8 @@ function assemble_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false
 
         step_U = _replace_symbolic_zeros_and_ones(step_U, gates_at_step, replace_symbolic_zeros, replace_symbolic_ones)
         U_total = step_U * U_total
-        display(step_U)
-        display(U_total)
+        #display(step_U)
+        #display(U_total)
     end
 
     return U_total
@@ -113,12 +114,12 @@ MSB = position 1) into the full `2^n_total × 2^n_total` Hilbert space by
 distributing gate matrix elements over the correct basis indices while treating
 all non-gate qubits as spectators.
 """
-function _embed_gate(gate_matrix::Union{Matrix, Symbolics.Arr{Symbolics.Num, 2}}, qubits_global_indices::Vector{Int}, n_total::Int)
+function _embed_gate(gate_matrix::Union{Matrix, Symbolics.Arr{Complex{Symbolics.Num}, 2}}, qubits_global_indices::Vector{Int}, n_total::Int)
     k = length(qubits_global_indices)
     @assert size(gate_matrix) == (2^k, 2^k) "Gate matrix size $(size(gate_matrix)) inconsistent with $(k) qubits"
 
     dim_full        = 2^n_total
-    result          = zeros(Symbolics.Num, dim_full, dim_full)
+    result          = zeros(Complex{Symbolics.Num}, dim_full, dim_full)
     other_qubits_global_indices = sort(setdiff(1:n_total, qubits_global_indices))
     n_other         = length(other_qubits_global_indices)
 

@@ -26,3 +26,5 @@ display(Symbolics.simplify(unitary))
 #display(unitary2)
 #println(qc.gatecollection.collections[QCSym.Gates.CX_Gate])
 
+s = QCSym.States.StateVector(ComplexF64, 2)
+display(s.vector_symbolic)

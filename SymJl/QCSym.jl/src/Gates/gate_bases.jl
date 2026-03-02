@@ -3,12 +3,13 @@ import SymbolicUtils
 import ..BitsRegs.AbstractBit
 import ..BitsRegs.MapBitID
 import ..BitsRegs.Bit
+import InteractiveUtils
 
 abstract type AbstractGate end
 abstract type AbstractQuantumGate{T} <: AbstractGate end
 abstract type AbstractSingleQubitQuantumGate{T} <: AbstractQuantumGate{T} end
 abstract type AbstractMultiQubitQuantumGate{T} <: AbstractQuantumGate{T} end
-abstract type AbstractInternalSingleQubitQuantumGate{T} <: AbstractSingleQubitQuantumGate{T} end
+abstract type AbstractInternalSingleQubitQuantumGate{T} <: AbstractQuantumGate{T} end
 
 macro insert_fields_AbstractQuantumGate()
     quote
@@ -26,10 +27,10 @@ macro insert_fields_AbstractQuantumGate()
         $(esc(:(qubits_c::Union{Nothing, Array{T,1}})))
         $(esc(:(step::Int)))
         $(esc(:(num_summands_decomposed::Int)))
-        $(esc(:(parameters::Union{Nothing, Dict{Symbolics.Num, <:Real}})))
-        $(esc(:(atomics::Vector{<:Symbolics.Num})))
+        $(esc(:(parameters::Union{Nothing, Dict{String, Dict{String, Union{Symbolics.Num, <:Real}}}})))
+        $(esc(:(atomics::Vector{<:Complex{Symbolics.Num}})))
         $(esc(:(atomics_alt::Union{Nothing, Vector{<:Symbolics.Num}})))
-        $(esc(:(matrix::Symbolics.Arr{Symbolics.Num,2})))
+        $(esc(:(matrix::Symbolics.Arr{Complex{Symbolics.Num},2})))
         $(esc(:(matrix_alt::Union{Nothing, Matrix{Symbolics.Num}, Matrix{Complex{Symbolics.Num}}, Symbolics.Arr{Symbolics.Num,2}, SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}})))
         $(esc(:(ids_matrix_zeros::Union{Nothing, Array{Int, 2}})))
         $(esc(:(matrix_numeric::Union{Nothing, Array{Complex,2}})))
@@ -52,7 +53,7 @@ mutable struct mutable_BaseQuantumGate_for_construction{T<:AbstractBit} <: Abstr
     function mutable_BaseQuantumGate_for_construction(; 
         is_treat_numeric_only::Bool,
         name_prefix::String, name_short::String, qubits_t::Vector{T}, qubits_c::Union{Nothing, Vector{T}}=nothing,
-        step::Int, num_summands_decomposed::Int, parameters::Union{Nothing, Vector{Symbolics.Num}, Dict{Symbolics.Num, <:Complex}, Dict{Symbolics.Num, <:Real}}=nothing) where {T<:AbstractBit}
+        step::Int, num_summands_decomposed::Int, parameters::Union{Nothing, AbstractVector{String}, Dict{String, Dict{Symbolics.Num, <:Real}}}=nothing) where {T<:AbstractBit}
         
         num_qubits, num_qubits_t, num_qubits_c = _determine_num_qubits(qubits_t, qubits_c)
         is_parametric = parameters !== nothing
@@ -67,19 +68,17 @@ mutable struct mutable_BaseQuantumGate_for_construction{T<:AbstractBit} <: Abstr
         step=step
         num_summands_decomposed=num_summands_decomposed
         if is_parametric
-            if parameters isa Vector{Symbolics.Num}
-                parameters = Dict(p => 0.0 for p in parameters)
-            elseif parameters isa Dict{Symbolics.Num, <:Complex}
-                parameters = parameters
-            elseif parameters isa Dict{Symbolics.Num, <:Real}
-                parameters = parameters
+            if parameters isa Vector{String}
+                _ps = collect((Symbol(_generate_name_str(p*"_"*name_short, step, qubits_t, qubits_c))) for p in parameters)
+                _ps = collect(Symbolics.@variables($(_ps[i]))[1] for i in eachindex(_ps))
+                parameters = Dict(parameters[i] => Dict("sym" => _ps[i], "val" => 0.0) for i in eachindex(parameters))
             else
                 error("parameters must be either a Vector{Symbolics.Num} or a Dict{Symbolics.Num, <:Complex} or a Dict{Symbolics.Num, <:Real}")
             end
         end        
         atomics = nothing # will be set after matrix
-        atomics_alt = parameters === nothing ? nothing : collect(keys(parameters))
-        matrix = eval(Meta.parse("Symbolics.@variables($(name)[1:$(shape[1]),1:$(shape[2])])"))
+        atomics_alt = parameters === nothing ? nothing : collect(v["sym"] for (k,v) in parameters)
+        matrix = eval(Meta.parse("Symbolics.@variables(($(name)::Complex)[1:$(shape[1]),1:$(shape[2])])"))
         matrix = matrix[1]
         matrix_alt = nothing
         atomics = Symbolics.scalarize(matrix)[:]
@@ -196,3 +195,25 @@ Base.show(io::IO, gate::T) where {T <: AbstractQuantumGate} = begin
         println(io, "  ", name, ": ", getfield(gate, name))
     end
 end
+
+
+function get_all_concrete_gates()
+    
+    return _subtypes(AbstractSingleQubitQuantumGate)
+end
+
+
+function _subtypes(type::Type)
+    out = Any[]
+    _subtypes!(out, type)
+end
+
+function _subtypes!(out, type::Type)
+    if !isabstracttype(type)
+        push!(out, type)
+    else
+        foreach(T->_subtypes!(out, T), InteractiveUtils.subtypes(type))
+    end
+    out
+end
+

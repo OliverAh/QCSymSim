@@ -7,7 +7,7 @@ import ..QCSym
 #import QCSym.Gates
 
 struct GateCollection
-    collections::Dict{Type{<:QCSym.Gates.AbstractGate}, Vector{Any}}
+    collections::Dict{Type{<:QCSym.Gates.AbstractGate}, Vector{<:QCSym.Gates.AbstractGate}}
 end
 
 @kwdef struct QuantumCircuit
@@ -84,7 +84,7 @@ end
 """kwargs are exclusively forwarded to the added gate. See their respective documentation."""
 function add_gate(circuit::QuantumCircuit, gate::Type{T}; kwargs...) where {T <: QCSym.Gates.AbstractGate}
     if !haskey(circuit.gatecollection.collections, gate)
-        circuit.gatecollection.collections[gate] = Any[]
+        circuit.gatecollection.collections[gate] = T[]
     end
     println(nameof(T))
     #println("$(gate)_for_Circuit")
@@ -116,4 +116,18 @@ function _replace_symbolic_zeros_and_ones(U::Matrix{T}, gates::AbstractVector{<:
         end
     end
     return Symbolics.substitute.(U, (dict_to_replace,))
+end
+
+function substitute_numerics_from_gates(expr::AbstractArray{T}, gates::AbstractVector{<:QCSym.Gates.AbstractGate}; fold=Val(true)) where {T<:Union{Symbolics.Num, Complex{Symbolics.Num}}}
+    dict_to_replace = Dict{Union{Symbolics.Num, Complex{Symbolics.Num}}, Float64}()
+    for g in gates
+        if g.matrix_numeric === nothing
+            continue
+        end
+        for id in eachindex(g.matrix)
+            dict_to_replace[real(g.matrix[id])] = real(g.matrix_numeric[id])
+            dict_to_replace[imag(g.matrix[id])] = imag(g.matrix_numeric[id])
+        end
+    end
+    return Symbolics.substitute.(expr, (dict_to_replace,), fold=fold)
 end

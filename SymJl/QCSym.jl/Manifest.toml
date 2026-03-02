@@ -2,7 +2,7 @@
 
 julia_version = "1.12.4"
 manifest_format = "2.0"
-project_hash = "f64a92256d4598f8bee6863c8ee98144eb6a6baa"
+project_hash = "0f7b9c28d019d2467abdabb3a97c5cb897443db1"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -447,7 +447,7 @@ uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
 
 [[deps.QSym]]
-deps = ["MacroTools", "SymbolicUtils", "Symbolics"]
+deps = ["LinearAlgebra", "MacroTools", "SymbolicUtils", "Symbolics"]
 path = "."
 uuid = "0e9590fd-0aff-4199-aa6a-f7e009366054"
 version = "0.1.0"
