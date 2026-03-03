@@ -318,9 +318,9 @@ function CX_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{Q
         name_prefix=name_prefix, name_short="CX", qubits_t=qubits_t, qubits_c=qubits_c,
         step=step, num_summands_decomposed=2)
     base_gate.matrix_numeric = [1.0 0.0 0.0 0.0;
+                                0.0 1.0 0.0 0.0;
                                 0.0 0.0 0.0 1.0;
-                                0.0 0.0 1.0 0.0;
-                                0.0 1.0 0.0 0.0]
+                                0.0 0.0 1.0 0.0]
     
     return CX_Gate(base_gate)
 end
@@ -335,9 +335,9 @@ function CY_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{Q
         name_prefix=name_prefix, name_short="CY", qubits_t=qubits_t, qubits_c=qubits_c,
         step=step, num_summands_decomposed=2)
     base_gate.matrix_numeric = [1.0 0.0 0.0 0.0;
+                                0.0 1.0 0.0 0.0;
                                 0.0 0.0 0.0 -1im;
-                                0.0 0.0 1.0 0.0;
-                                0.0 1im 0.0 0.0]
+                                0.0 0.0 1im 0.0]
     
     return CY_Gate(base_gate)
 end
@@ -365,10 +365,10 @@ struct CP_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
     
 end
 
-function CP_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
+function CP_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, qubits_c::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
     params = ["λ"]
     base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
-        name_prefix=name_prefix, name_short="CP", qubits_t=qubits_t, qubits_c=nothing,
+        name_prefix=name_prefix, name_short="CP", qubits_t=qubits_t, qubits_c=qubits_c,
         step=step, num_summands_decomposed=2, parameters = params)
     λ = base_gate.parameters["λ"]["sym"]
     base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
@@ -386,11 +386,12 @@ struct CRX_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
 end
 
 function CRX_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, qubits_c::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
-    θ = Symbolics.@variables(θ::Real)[1]
+    params = ["θ"]
     base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
         name_prefix=name_prefix, name_short="CRX", qubits_t=qubits_t, qubits_c=qubits_c,
-        step=step, num_summands_decomposed=2, parameters = Dict(θ => 0.0))
-    
+        step=step, num_summands_decomposed=2, parameters = params)
+    params = base_gate.parameters
+    θ = params["θ"]["sym"]
     base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
                                    0.0 1.0 0.0 0.0;
                                    0.0 0.0 cos(θ/2) -sin(θ/2)*1im;
@@ -406,11 +407,12 @@ struct CRY_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
 end
 
 function CRY_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, qubits_c::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
-    θ = Symbolics.@variables(θ::Real)[1]
+    params = ["θ"]
     base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
         name_prefix=name_prefix, name_short="CRY", qubits_t=qubits_t, qubits_c=qubits_c,
-        step=step, num_summands_decomposed=2, parameters = Dict(θ => 0.0))
-    
+        step=step, num_summands_decomposed=2, parameters = params)
+    params = base_gate.parameters
+    θ = params["θ"]["sym"]
     base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
                                    0.0 1.0 0.0 0.0;
                                    0.0 0.0 cos(θ/2) -sin(θ/2);
@@ -426,15 +428,16 @@ struct CRY_OQ3_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
 end
 
 function CRY_OQ3_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, qubits_c::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
-    θ = Symbolics.@variables(θ::Real)[1]
+    params = ["θ"]
     base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
         name_prefix=name_prefix, name_short="CRY_OQ3", qubits_t=qubits_t, qubits_c=qubits_c,
-        step=step, num_summands_decomposed=2, parameters = Dict(θ => 0.0))
-    
+        step=step, num_summands_decomposed=2, parameters = params)
+    params = base_gate.parameters
+    θ = params["θ"]["sym"]
     base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
                                    0.0 1.0 0.0 0.0;
-                                   0.0 0.0 cos(θ/2) sin(θ/2);
-                                   0.0 0.0 -sin(θ/2) cos(θ/2)])
+                                   0.0 0.0 cos(θ/2) -sin(θ/2);
+                                   0.0 0.0 sin(θ/2) cos(θ/2)])
     base_gate.is_treat_alt_only = is_treat_alt_only
     return CRY_OQ3_Gate(base_gate)
 end
@@ -446,11 +449,12 @@ struct CRZ_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
 end
 
 function CRZ_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, qubits_c::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
-    θ = Symbolics.@variables(θ::Real)[1]
+    params = ["θ"]
     base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
         name_prefix=name_prefix, name_short="CRZ", qubits_t=qubits_t, qubits_c=qubits_c,
-        step=step, num_summands_decomposed=2, parameters = Dict(θ => 0.0))
-    
+        step=step, num_summands_decomposed=2, parameters = params)
+    params = base_gate.parameters
+    θ = params["θ"]["sym"]
     base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
                                    0.0 1.0 0.0 0.0;
                                    0.0 0.0 exp(-1im*θ/2) 0.0;
@@ -471,9 +475,9 @@ function CH_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{Q
         step=step, num_summands_decomposed=2)
     
     base_gate.matrix_numeric = Matrix([1.0 0.0 0.0 0.0;
-                                   0.0 1.0 0.0 0.0;
-                                   0.0 0.0 1.0 1.0;
-                                   0.0 0.0 1.0 -1.0]) / sqrt(2)
+                                       0.0 1.0 0.0 0.0;
+                                       0.0 0.0 1.0 1.0;
+                                       0.0 0.0 1.0 -1.0]) / sqrt(2)
     return CH_Gate(base_gate)
 end
 
@@ -484,13 +488,19 @@ struct CU_Gate{T<:AbstractBit} <: AbstractSingleQubitQuantumGate{T}
 end
 
 function CU_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector{QBit}, qubits_c::AbstractVector{QBit}, step::Int, is_treat_numeric_only::Bool, is_treat_alt_only::Bool=false)
-    θ, ϕ, λ, γ= Symbolics.@variables(θ::Real, ϕ::Real, λ::Real, γ::Real)[1]
+    params = ["θ", "ϕ", "λ", "γ"]
     base_gate = mutable_BaseQuantumGate_for_construction(is_treat_numeric_only=is_treat_numeric_only,
         name_prefix=name_prefix, name_short="CU", qubits_t=qubits_t, qubits_c=qubits_c,
-        step=step, num_summands_decomposed=2, parameters = Dict(p => 0.0 for p in [θ, ϕ, λ, γ]))
-    
-    umat = exp(1im*γ)*Matrix([cos(θ/2) -exp(1im*λ)*sin(θ/2);
-                              exp(1im*ϕ)*sin(θ/2) exp(1im*(ϕ+λ))*cos(θ/2)])
+        step=step, num_summands_decomposed=2, parameters = params)
+    params = base_gate.parameters
+    θ = params["θ"]["sym"]
+    ϕ = params["ϕ"]["sym"]
+    λ = params["λ"]["sym"]
+    γ = params["γ"]["sym"]
+    umat = [exp(im*γ)*cos(θ/2)    -exp(im*(γ+λ))*sin(θ/2);
+            exp(im*(γ+ϕ))*sin(θ/2) exp(im*(γ+ϕ+λ))*cos(θ/2)]
+    #umat = exp(1im*γ)*Matrix([cos(θ/2) -exp(1im*λ)*sin(θ/2);
+    #                          exp(1im*ϕ)*sin(θ/2) exp(1im*(ϕ+λ))*cos(θ/2)])
     base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
                                    0.0 1.0 0.0 0.0;
                                    0.0 0.0 umat[1,1] umat[1,2];
@@ -510,7 +520,7 @@ function SWAP_Gate_for_Circuit(;name_prefix::String="", qubits_t::AbstractVector
         name_prefix=name_prefix, name_short="SWAP", qubits_t=qubits_t, qubits_c=nothing,
         step=step, num_summands_decomposed=1)
     
-    base_gate.matrix_alt = Matrix([1.0 0.0 0.0 0.0;
+    base_gate.matrix_numeric = Matrix([1.0 0.0 0.0 0.0;
                                    0.0 0.0 1.0 0.0;
                                    0.0 1.0 0.0 0.0;
                                    0.0 0.0 0.0 1.0])

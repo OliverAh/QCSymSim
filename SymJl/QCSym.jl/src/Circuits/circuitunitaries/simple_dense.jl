@@ -73,7 +73,7 @@ function assemble_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false
         for gate in multi_gates
             #positions  = sort([qubit_pos[(q.name_reg, Int(q.index_local))] for q in gate.qubits])
             #positions  = sort([q.index_global for q in gate.qubits])
-            positions  = collect([q.index_global for q in gate.qubits])
+            positions  = collect(reverse([q.index_global for q in gate.qubits]))
             gate_mat   = begin
                 if gate.is_treat_numeric_only
                     gate.matrix_numeric

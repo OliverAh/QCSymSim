@@ -350,24 +350,6 @@ end
             @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
         end
 
-        @testset "CX gate action on 2 qubit system, qubit_t < qubit_c" begin
-            q1 = [0.5+0im, sqrt(3)/2+0im]
-            q2 = [sqrt(5)+0im, 0.0+2.0im]
-            statevec = QCSym.States.StateVector([q1, q2])
-            gate = QCSym.Gates.CX_Gate
-            expected_statevec_after = [q1[1]*q2[1],
-                                       q1[2]*q2[2],
-                                       q1[2]*q2[1],
-                                       q1[1]*q2[2]]
-            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
-            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]],step=1, is_treat_numeric_only=false)
-            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
-            U_statevec_numeric = U * statevec.vector_numeric
-            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
-            @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
-        end
-
         @testset "CX gate action on 2 qubit system, qubit_t > qubit_c" begin
             q1 = [0.5+0im, sqrt(3)/2+0im]
             q2 = [sqrt(5)+0im, 0.0+2.0im]
@@ -380,6 +362,24 @@ end
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
             QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], qubits_c=[qreg[1]],step=1, is_treat_numeric_only=false)
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
+        end
+
+        @testset "CX gate action on 2 qubit system, qubit_t < qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CX_Gate
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[2]*q2[2],
+                                       q1[2]*q2[1],
+                                       q1[1]*q2[2]]
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]],step=1, is_treat_numeric_only=false)
             U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
             U_statevec_numeric = U * statevec.vector_numeric
             statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
@@ -440,7 +440,7 @@ end
             @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
         end
 
-        @testset "CP gate action on 2 qubit system, qubit_t_1 < qubit_t_2" begin
+        @testset "CP gate action on 2 qubit system, qubit_t < qubit_c" begin
             q1 = [0.5+0im, sqrt(3)/2+0im]
             q2 = [sqrt(5)+0im, 0.0+2.0im]
             statevec = QCSym.States.StateVector([q1, q2])
@@ -448,7 +448,7 @@ end
             expected_statevec_after = nothing
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1], qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
             λ = qc.gatecollection.collections[gate][1].parameters["λ"]["sym"]
             expected_statevec_after = [q1[1]*q2[1],
                                        q1[1]*q2[2],
@@ -465,7 +465,7 @@ end
             @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
         end
 
-        @testset "CP gate action on 2 qubit system, qubit_t_1 > qubit_t_2" begin
+        @testset "CP gate action on 2 qubit system, qubit_t > qubit_c" begin
             q1 = [0.5+0im, sqrt(3)/2+0im]
             q2 = [sqrt(5)+0im, 0.0+2.0im]
             statevec = QCSym.States.StateVector([q1, q2])
@@ -473,7 +473,7 @@ end
             expected_statevec_after = nothing
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2], qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], qubits_c=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
             λ = qc.gatecollection.collections[gate][1].parameters["λ"]["sym"]
             expected_statevec_after = [q1[1]*q2[1],
                                        q1[1]*q2[2],
@@ -488,6 +488,228 @@ end
             # For some reason expected_statevec_after contains these exp(0), which need ot be replaced manually
             expected_statevec_after = Symbolics.substitute.(expected_statevec_after, (Dict(zze=>1.0),))
             @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
+        end
+
+        @testset "CRX gate action on 2 qubit system, qubit_t > qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CRX_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], qubits_c=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            θ = qc.gatecollection.collections[gate][1].parameters["θ"]["sym"]
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[1]*q2[2],
+                                       cos(θ/2)*q1[2]*q2[1] - im*sin(θ/2)*q1[2]*q2[2],
+                                       -im*sin(θ/2)*q1[2]*q2[1] + cos(θ/2)*q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
+        end
+
+        @testset "CRY gate action on 2 qubit system, qubit_t < qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CRY_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            θ = qc.gatecollection.collections[gate][1].parameters["θ"]["sym"]
+            expected_statevec_after = [q1[1]*q2[1],
+                                       cos(θ/2)*q1[1]*q2[2] - sin(θ/2)*q1[2]*q2[2],
+                                       q1[2]*q2[1],
+                                       sin(θ/2)*q1[1]*q2[2] + cos(θ/2)*q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
+        end
+
+        @testset "CRZ gate action on 2 qubit system, qubit_t > qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CRZ_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], qubits_c=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            θ = qc.gatecollection.collections[gate][1].parameters["θ"]["sym"]
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[1]*q2[2],
+                                       exp(-1im*θ/2)*q1[2]*q2[1],
+                                       exp(1im*θ/2)*q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            ze = Symbolics.@variables(z)[1]
+            zze = Symbolics.substitute(exp(ze), Dict(ze=>0)) 
+            # zze --> exp(0), where 0 is treated as a symbol.
+            # For some reason expected_statevec_after contains these exp(0), which need ot be replaced manually
+            expected_statevec_after = Symbolics.substitute.(expected_statevec_after, (Dict(zze=>1.0),))
+            # @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
+            # Dont know why, but the Symbolics.isequal test fails here
+            @test custom_issapprox_for_vecs_or_mats([0,0,0,0], statevec_after_numeric_subsd - expected_statevec_after)
+        end
+
+        @testset "CRZ gate action on 2 qubit system, qubit_t < qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CRZ_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            θ = qc.gatecollection.collections[gate][1].parameters["θ"]["sym"]
+            expected_statevec_after = [q1[1]*q2[1],
+                                       exp(-1im*θ/2)*q1[1]*q2[2],
+                                       q1[2]*q2[1],
+                                       exp(1im*θ/2)*q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            ze = Symbolics.@variables(z)[1]
+            zze = Symbolics.substitute(exp(ze), Dict(ze=>0)) 
+            # zze --> exp(0), where 0 is treated as a symbol.
+            # For some reason expected_statevec_after contains these exp(0), which need ot be replaced manually
+            expected_statevec_after = Symbolics.substitute.(expected_statevec_after, (Dict(zze=>1.0),))
+            # @test all(Symbolics.isequal.(statevec_after_numeric_subsd, expected_statevec_after))
+            # Dont know why, but the Symbolics.isequal test fails here
+            @test custom_issapprox_for_vecs_or_mats([0,0,0,0], statevec_after_numeric_subsd - expected_statevec_after)
+        end
+
+        @testset "CH gate action on 2 qubit system, qubit_t > qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CH_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], qubits_c=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[1]*q2[2],
+                                       q1[2]*q2[1] + q1[2]*q2[2],
+                                       q1[2]*q2[1] - q1[2]*q2[2]] / sqrt(2)
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
+        end
+
+        @testset "CH gate action on 2 qubit system, qubit_t < qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CH_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]], step=1, is_treat_numeric_only=false)
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[1]*q2[2] + q1[2]*q2[2],
+                                       q1[2]*q2[1],
+                                       q1[1]*q2[2] - q1[2]*q2[2]] / sqrt(2)
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
+        end
+
+        @testset "CU gate action on 2 qubit system, qubit_t > qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CU_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], qubits_c=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            params = ["θ", "ϕ", "λ", "γ"]
+            θ, ϕ, λ, γ = [qc.gatecollection.collections[gate][1].parameters[p]["sym"] for p in params]
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[1]*q2[2],
+                                       exp(im*γ)*cos(θ/2)*q1[2]*q2[1] - exp(im*(γ+λ))*sin(θ/2)*q1[2]*q2[2],
+                                       exp(im*(γ+ϕ))*sin(θ/2)*q1[2]*q2[1] + exp(im*(γ+ϕ+λ))*cos(θ/2)*q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            ze = Symbolics.@variables(z)[1]
+            zze = Symbolics.substitute(exp(ze), Dict(ze=>0)) 
+            # zze --> exp(0), where 0 is treated as a symbol.
+            # For some reason expected_statevec_after contains these exp(0), which need ot be replaced manually
+            expected_statevec_after = Symbolics.substitute.(expected_statevec_after, (Dict(zze=>1.0),), fold=Val(true))
+            @test custom_issapprox_for_vecs_or_mats([0,0,0,0], statevec_after_numeric_subsd - expected_statevec_after)
+        end
+
+        @testset "CU gate action on 2 qubit system, qubit_t < qubit_c" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.CU_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], qubits_c=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            params = ["θ", "ϕ", "λ", "γ"]
+            θ, ϕ, λ, γ = [qc.gatecollection.collections[gate][1].parameters[p]["sym"] for p in params]
+            expected_statevec_after = [q1[1]*q2[1],
+                                       exp(im*γ)*cos(θ/2)*q1[1]*q2[2] - exp(im*(γ+λ))*sin(θ/2)*q1[2]*q2[2],
+                                       q1[2]*q2[1],
+                                       exp(im*(γ+ϕ))*sin(θ/2)*q1[1]*q2[2] + exp(im*(γ+ϕ+λ))*cos(θ/2)*q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            ze = Symbolics.@variables(z)[1]
+            zze = Symbolics.substitute(exp(ze), Dict(ze=>0)) 
+            # zze --> exp(0), where 0 is treated as a symbol.
+            # For some reason expected_statevec_after contains these exp(0), which need ot be replaced manually
+            expected_statevec_after = Symbolics.substitute.(expected_statevec_after, (Dict(zze=>1.0),), fold=Val(true))
+            @test custom_issapprox_for_vecs_or_mats([0,0,0,0], statevec_after_numeric_subsd - expected_statevec_after)
+        end
+
+        @testset "SWAP gate action on 2 qubit system, qubit_t_1 < qubit_t_2" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.SWAP_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1], qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[2]*q2[1],
+                                       q1[1]*q2[2],
+                                       q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
+        end
+
+        @testset "SWAP gate action on 2 qubit system, qubit_t_1 > qubit_t_2" begin
+            q1 = [0.5+0im, sqrt(3)/2+0im]
+            q2 = [sqrt(5)+0im, 0.0+2.0im]
+            statevec = QCSym.States.StateVector([q1, q2])
+            gate = QCSym.Gates.SWAP_Gate
+            expected_statevec_after = nothing
+            qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
+            qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2], qreg[1]], step=1, is_treat_numeric_only=false)
+            expected_statevec_after = [q1[1]*q2[1],
+                                       q1[2]*q2[1],
+                                       q1[1]*q2[2],
+                                       q1[2]*q2[2]]
+            U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
+            U_statevec_numeric = U * statevec.vector_numeric
+            statevec_after_numeric_subsd = QCSym.Circuits.substitute_numerics_from_gates(U_statevec_numeric, qc.gatecollection.collections[gate])
+            @test custom_issapprox_for_vecs_or_mats(statevec_after_numeric_subsd, expected_statevec_after)
         end
         
     end
