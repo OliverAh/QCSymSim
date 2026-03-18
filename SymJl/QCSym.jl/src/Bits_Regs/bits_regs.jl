@@ -110,7 +110,8 @@ mutable struct BitRegister{T<:AbstractBit} <: AbstractRegister
     bits::Vector{T}
     
     function BitRegister(; context::MapBitID, name::String, size::Int, is_quantum::Bool)
-        _T = is_quantum ? AbstractQuantumBit : AbstractClassicalBit
+        #_T = is_quantum ? AbstractQuantumBit : AbstractClassicalBit
+        _T = is_quantum ? QBit : CBit
         if is_quantum && !has_qreg(context, name)
             #add_qreg(context, name, size)
             @assert !has_qreg(context, name) "Quantum register with name $name already exists in context"

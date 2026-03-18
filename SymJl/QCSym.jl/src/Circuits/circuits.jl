@@ -13,10 +13,10 @@ end
 @kwdef struct QuantumCircuit
     name::String = "MyCircuit"
     context::QCSym.BitsRegs.MapBitID = QCSym.BitsRegs.MapBitID()
-    qregs::Vector{<:QCSym.BitsRegs.BitRegister{<:QCSym.BitsRegs.AbstractQuantumBit}} = QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.AbstractQuantumBit}[]
-    cregs::Vector{<:QCSym.BitsRegs.BitRegister{<:QCSym.BitsRegs.AbstractClassicalBit}} = QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.AbstractClassicalBit}[]
+    qregs::Vector{QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.QBit}} = QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.QBit}[]
+    cregs::Vector{QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.CBit}} = QCSym.BitsRegs.BitRegister{QCSym.BitsRegs.CBit}[]
     gatecollection::GateCollection = GateCollection(Dict())
-    barriers::Vector{Any} = Any[]
+    barriers::Vector{Int} = Int[]
 end
 
 function get_num_qubits(qc::QuantumCircuit)
@@ -86,7 +86,7 @@ function add_gate(circuit::QuantumCircuit, gate::Type{T}; kwargs...) where {T <:
     if !haskey(circuit.gatecollection.collections, gate)
         circuit.gatecollection.collections[gate] = T[]
     end
-    println(nameof(T))
+    #println(nameof(T))
     #println("$(gate)_for_Circuit")
     #println(Meta.parse("$(gate)_for_Circuit"))
     gate_constructor = eval(Meta.parse("$(gate)_for_Circuit"))
@@ -99,23 +99,27 @@ end
 
 function _replace_symbolic_zeros_and_ones(U::Matrix{T}, gates::AbstractVector{<:QCSym.Gates.AbstractGate}, replace_symbolic_zeros::Bool, replace_symbolic_ones::Bool) where {T<:Union{Symbolics.Num, Complex{Symbolics.Num}}}
     
-    dict_to_replace = Dict{Symbolics.Num, Complex}()
+    dict_to_replace = Dict{Union{Symbolics.Num, Complex{Symbolics.Num}}, Complex}()
     for g in gates
         if g.matrix_numeric === nothing
             continue
         end
         if replace_symbolic_zeros
             for id_zero in findall(x -> x == 0, g.matrix_numeric)
-                dict_to_replace[g.matrix[id_zero]] = 0
+                #dict_to_replace[g.matrix[id_zero]] = 0
+                dict_to_replace[real(g.matrix[id_zero])] = 0
+                dict_to_replace[imag(g.matrix[id_zero])] = 0
             end
         end
         if replace_symbolic_ones
             for id_one in findall(x -> x == 1, g.matrix_numeric)
-                dict_to_replace[g.matrix[id_one]] = 1
+                #dict_to_replace[g.matrix[id_one]] = 1
+                dict_to_replace[real(g.matrix[id_one])] = 1
+                dict_to_replace[imag(g.matrix[id_one])] = 0
             end
         end
     end
-    return Symbolics.substitute.(U, (dict_to_replace,))
+    return Symbolics.substitute.(U, (dict_to_replace,), fold=Val(true))
 end
 
 function substitute_numerics_from_gates(expr::AbstractArray{T}, gates::AbstractVector{<:QCSym.Gates.AbstractGate}; fold=Val(true)) where {T<:Union{Symbolics.Num, Complex{Symbolics.Num}}}
@@ -125,9 +129,11 @@ function substitute_numerics_from_gates(expr::AbstractArray{T}, gates::AbstractV
             continue
         end
         for id in eachindex(g.matrix)
+            #println(typeof(g.matrix[id]), " ", eltype(g.matrix[id]), " ", g.matrix[id], " => ", typeof(g.matrix_numeric[id]))
             dict_to_replace[real(g.matrix[id])] = real(g.matrix_numeric[id])
             dict_to_replace[imag(g.matrix[id])] = imag(g.matrix_numeric[id])
         end
     end
-    return Symbolics.substitute.(expr, (dict_to_replace,), fold=fold)
+    #println("to replace: ", dict_to_replace)
+    return Symbolics.substitute.(expr, (dict_to_replace,))
 end

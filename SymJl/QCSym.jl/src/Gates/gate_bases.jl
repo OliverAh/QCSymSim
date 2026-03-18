@@ -69,7 +69,7 @@ mutable struct mutable_BaseQuantumGate_for_construction{T<:AbstractBit} <: Abstr
         num_summands_decomposed=num_summands_decomposed
         if is_parametric
             if parameters isa Vector{String}
-                _ps = collect((Symbol(_generate_name_str(p*"_"*name_short, step, qubits_t, qubits_c))) for p in parameters)
+                _ps = collect((Symbol(_generate_name_str(p*"_"*name_prefix*name_short, step, qubits_t, qubits_c))) for p in parameters)
                 _ps = collect(Symbolics.@variables($(_ps[i]))[1] for i in eachindex(_ps))
                 parameters = Dict(parameters[i] => Dict("sym" => _ps[i], "val" => 0.0) for i in eachindex(parameters))
             else
