@@ -1,0 +1,23 @@
+using Test
+
+#tests = ["assem", "disassem", "simulator"]
+tests = ["gates", "disassem", "simulator"]
+if !isempty(ARGS)
+	tests = ARGS  # Set list to same as command line args
+end
+
+
+dict_testfiles = Dict(
+    "gates" => "Gates/gates_tests.jl",
+    "disassem" => "disassem_tests.jl",
+    "simulator" => "simulator_tests.jl"
+)
+
+
+
+@testset "All Tests" begin
+    for t in tests
+        println("Running tests: $t")
+        include(dict_testfiles[t])
+    end
+end

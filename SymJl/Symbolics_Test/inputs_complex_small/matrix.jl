@@ -1,0 +1,4 @@
+expr =[
+[phi0*(H_qt0_qc_s1_p00*cos(theta_RY_qt0_qc_s2/2) - H_qt0_qc_s1_p10*sin(theta_RY_qt0_qc_s2/2)) + phi1*(H_qt0_qc_s1_p01*cos(theta_RY_qt0_qc_s2/2) - H_qt0_qc_s1_p11*sin(theta_RY_qt0_qc_s2/2))],
+[phi0*(H_qt0_qc_s1_p00*sin(theta_RY_qt0_qc_s2/2) + H_qt0_qc_s1_p10*cos(theta_RY_qt0_qc_s2/2)) + phi1*(H_qt0_qc_s1_p01*sin(theta_RY_qt0_qc_s2/2) + H_qt0_qc_s1_p11*cos(theta_RY_qt0_qc_s2/2))]
+]

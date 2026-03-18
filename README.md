@@ -1,4 +1,5 @@
 # QCSymSim
 Repo for Symbolic Quantum Circuit Simulation  
   
-Currently only SymPy appraoch is developed. Other approaches were discarded after initial quick tests.
+Initial implementation was using Python and SymPy. Unfortunately, this has some computational bottlenecks. 
+Therefore, development is now ongoing in Julia using Symbolics.jl. 
