@@ -232,7 +232,7 @@ end
             expected_statevec_after = nothing
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 1)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true, param_values=Dict{String, Real}())
             gate_params = qc.gatecollection.collections[gate][1].parameters
             expected_statevec_after = exp(1im*gate_params["γ"]["sym"])*q1
             U = QCSym.Circuits.assemble_symbolic_unitary(qc, false, false)
@@ -254,7 +254,7 @@ end
             expected_statevec_after = nothing
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[1]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true, param_values=Dict{String, Real}())
             gate_params = qc.gatecollection.collections[gate][1].parameters
             θ = gate_params["θ"]["sym"]
             expected_statevec_after = [(cos(θ/2)*q1[1]-1im*sin(θ/2)*q1[2])*q2[1],
@@ -280,7 +280,7 @@ end
             expected_statevec_after = nothing
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true, param_values=Dict{String, Real}())
             gate_params = qc.gatecollection.collections[gate][1].parameters
             θ = gate_params["θ"]["sym"]
             expected_statevec_after = [q1[1]*(cos(θ/2)*q2[1]-sin(θ/2)*q2[2]),
@@ -306,7 +306,7 @@ end
             expected_statevec_after = nothing
             qc = QCSym.Circuits.QuantumCircuit(name="TestCircuit")
             qreg = QCSym.Circuits.add_qreg(qc, "q_reg_1", 2)
-            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true)
+            QCSym.Circuits.add_gate(qc, gate, qubits_t=[qreg[2]], step=1, is_treat_numeric_only=false, is_treat_alt_only=true, param_values=Dict{String, Real}())
             gate_params = qc.gatecollection.collections[gate][1].parameters
             θ = gate_params["θ"]["sym"]
             expected_statevec_after = [q1[1]*exp(-1im*θ/2)*q2[1],

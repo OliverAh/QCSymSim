@@ -1,7 +1,7 @@
 using Test
 
 #tests = ["assem", "disassem", "simulator"]
-tests = ["gates", "disassem", "simulator"]
+tests = ["gates", "symjit", "symbolics"]
 if !isempty(ARGS)
 	tests = ARGS  # Set list to same as command line args
 end
@@ -9,8 +9,8 @@ end
 
 dict_testfiles = Dict(
     "gates" => "Gates/gates_tests.jl",
-    "disassem" => "disassem_tests.jl",
-    "simulator" => "simulator_tests.jl"
+    "symjit" => "SymJit/symjit_tests.jl",
+    "symbolics" => "Symbolics/symbolics_test.jl"
 )
 
 
