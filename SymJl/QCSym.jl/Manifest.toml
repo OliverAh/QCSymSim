@@ -1559,7 +1559,7 @@ uuid = "43287f4e-b6f4-7ad1-bb20-aadabca52c3d"
 version = "1.4.0"
 
 [[deps.QCSym]]
-deps = ["InteractiveUtils", "LinearAlgebra", "MacroTools", "Plots", "PrecompileTools", "SymbolicUtils", "Symbolics"]
+deps = ["InteractiveUtils", "LinearAlgebra", "MacroTools", "Plots", "PrecompileTools", "SymJit", "SymbolicUtils", "Symbolics"]
 path = "."
 uuid = "0e9590fd-0aff-4199-aa6a-f7e009366054"
 version = "0.1.0"

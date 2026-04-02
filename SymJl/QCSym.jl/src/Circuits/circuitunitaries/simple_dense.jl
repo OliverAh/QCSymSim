@@ -27,7 +27,7 @@ function assemble_unitary(qc::QuantumCircuit, replace_symbolic_zeros::Bool=false
     end
 
     # ── 2. Collect every gate from the gate collection ───────────────────────────
-    all_gates = []
+    all_gates = QCSym.Gates.AbstractGate[]
     for (_, gates) in qc.gatecollection.collections
         append!(all_gates, gates)
     end
